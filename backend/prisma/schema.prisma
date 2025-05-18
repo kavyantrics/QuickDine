@@ -1,0 +1,135 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Restaurant {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  phone       String?
+  email       String     @unique
+  logo        String?
+  tables      Table[]
+  menuItems   MenuItem[]
+  orders      Order[]
+  users       User[]     // Staff members
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String    // Hashed password
+  image         String?
+  role          String    @default("staff") // admin, staff
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurantId  String?
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]   // Orders created by staff
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Table {
+  id           String     @id @default(cuid())
+  number       Int
+  capacity     Int        @default(4)
+  status       String     @default("available") // available, occupied, reserved
+  qrCode       String     @unique
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId String
+  orders       Order[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([restaurantId, number])
+}
+
+model MenuItem {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  category     String
+  image        String?
+  isAvailable  Boolean    @default(true)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId String
+  orderItems   OrderItem[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Order {
+  id             String     @id @default(cuid())
+  orderNumber    String     @unique // For display purposes (e.g., #2023001)
+  status         String     @default("pending") // pending, preparing, served, cancelled
+  items          OrderItem[]
+  table          Table      @relation(fields: [tableId], references: [id])
+  tableId        String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId   String
+  user           User?      @relation(fields: [userId], references: [id]) // Staff who handled the order
+  userId         String?
+  customerName   String
+  customerPhone  String
+  specialRequests String?
+  totalAmount    Float
+  paymentStatus  String     @default("pending") // pending, paid, failed
+  paymentMethod  String?    // cash, card, etc.
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemId String
+  order      Order    @relation(fields: [orderId], references: [id])
+  orderId    String
+  price      Float    // Price at the time of order
+  notes      String?  // Special instructions for this item
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
