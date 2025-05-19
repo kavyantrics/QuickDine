@@ -14,7 +14,6 @@ interface CartDrawerProps {
 export function CartDrawer({ restaurantId, tableId }: CartDrawerProps) {
   const router = useRouter()
   const { items, total, clearCart } = useCart()
-  console.log('CartDrawer items:', items)
 
   const handleCheckout = () => {
     router.push(`/${restaurantId}/${tableId}/checkout`)

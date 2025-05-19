@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { use } from 'react'
 import MenuClient from './MenuClient'
 
 interface PageProps {
@@ -8,10 +9,12 @@ interface PageProps {
   }
 }
 
-export default async function MenuPage({ params }: PageProps) {
+export default function MenuPage({ params }: PageProps) {
+  const { restaurantId, tableId } = use(Promise.resolve(params))
+  
   return (
     <Suspense fallback={<div className="container mx-auto py-8">Loading...</div>}>
-      <MenuClient restaurantId={params.restaurantId} tableId={params.tableId} />
+      <MenuClient restaurantId={restaurantId} tableId={tableId} />
     </Suspense>
   )
 } 

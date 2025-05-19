@@ -17,7 +17,7 @@ import {
 
 export default function OrdersPage() {
   const router = useRouter()
-  const { pusher } = usePusher()
+  const { pusher, isConnected } = usePusher()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [generatingBillId, setGeneratingBillId] = useState<string | null>(null)
@@ -46,37 +46,59 @@ export default function OrdersPage() {
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!pusher) return
-    
+    if (!pusher || !isConnected) {
+      return
+    }
+
     const restaurantId = localStorage.getItem('restaurantId')
-    if (!restaurantId) return
+    if (!restaurantId) {
+      return
+    }
 
-    const channel = pusher.subscribe(`restaurant-${restaurantId}`)
-    
-    channel.bind('order-created', (newOrder: Order) => {
-      setOrders(prev => [newOrder, ...prev])
-      toast.success('New order received!')
-    })
+    const channelName = `restaurant-${restaurantId}`
+    const newChannel = pusher.subscribe(channelName)
 
-    channel.bind('order-updated', (updatedOrder: Order) => {
-      setOrders(prev => prev.map(order => 
-        order.id === updatedOrder.id ? updatedOrder : order
-      ))
-      toast.info('Order updated!')
-    })
+    const handleSubscriptionSucceeded = () => {
+    }
 
-    channel.bind('order-status-updated', (data: { orderId: string, status: Order['status'] }) => {
-      setOrders(prev => prev.map(order => 
+    const handleSubscriptionError = (error: Error) => {
+      console.error('Failed to subscribe to channel:', error)
+      toast.error('Failed to connect to real-time updates')
+    }
+
+    const handleNewOrder = (data: { order: Order, message: string }) => {
+      setOrders(prev => [data.order, ...prev])
+      toast.success(data.message)
+    }
+
+    const handleOrderStatusUpdate = (data: { 
+      orderId: string, 
+      status: Order['status'],
+      orderNumber: string,
+      tableNumber: string,
+      message: string 
+    }) => {
+      setOrders(prev => prev.map(order =>
         order.id === data.orderId ? { ...order, status: data.status } : order
       ))
-      toast.info('Order status updated!')
-    })
+      toast.info(data.message)
+    }
+
+    newChannel.bind('pusher:subscription_succeeded', handleSubscriptionSucceeded)
+    newChannel.bind('pusher:subscription_error', handleSubscriptionError)
+    newChannel.bind('new-order', handleNewOrder)
+    newChannel.bind('order-status-updated', handleOrderStatusUpdate)
 
     return () => {
-      channel.unbind_all()
-      channel.unsubscribe()
+      if (newChannel) {
+        newChannel.unbind('pusher:subscription_succeeded', handleSubscriptionSucceeded)
+        newChannel.unbind('pusher:subscription_error', handleSubscriptionError)
+        newChannel.unbind('new-order', handleNewOrder)
+        newChannel.unbind('order-status-updated', handleOrderStatusUpdate)
+        newChannel.unsubscribe()
+      }
     }
-  }, [pusher])
+  }, [pusher, isConnected])
 
   const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
     try {
