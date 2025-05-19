@@ -52,7 +52,7 @@ async function generateQRCodes() {
         }
 
         // Create QR code URL (you can customize this based on your frontend URL)
-        const qrUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/menu?r=${tableData.restaurantId}&t=${tableData.tableId}`
+        const qrUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/${tableData.restaurantId}/${tableData.tableId}`
 
         // Generate QR code
         const qrCodePath = path.join(restaurantDir, `table-${table.number}.png`)
