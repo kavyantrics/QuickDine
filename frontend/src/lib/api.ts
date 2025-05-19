@@ -1,10 +1,19 @@
 import { MenuItem, Order, Restaurant } from '@/types'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface LoginResponse {
-  token: string
-  restaurant: Restaurant
+  success: boolean
+  data: {
+    user: {
+      id: string
+      email: string
+      name: string
+      role: string
+      restaurantId: string
+    }
+    token: string
+  }
 }
 
 interface SignupRestaurantData {
@@ -38,9 +47,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // Get menu items for a restaurant and table
 export async function getMenu(restaurantId: string, tableId: string): Promise<MenuItem[]> {
   const response = await fetch(
-    `${API_URL}/api/menu?restaurantId=${restaurantId}&tableId=${tableId}`
+    `${API_URL}/api/restaurants/menu?restaurantId=${restaurantId}&tableId=${tableId}`
   )
-  return handleResponse<MenuItem[]>(response)
+  const result = await handleResponse<{ success: boolean; data: MenuItem[] }>(response)
+  return result.data
 }
 
 // Submit a new order
@@ -81,8 +91,14 @@ export async function signupRestaurant(data: SignupRestaurantData): Promise<Rest
 
 // Get orders for a restaurant
 export async function getOrders(restaurantId: string): Promise<Order[]> {
-  const response = await fetch(`${API_URL}/api/orders?restaurantId=${restaurantId}`)
-  return handleResponse<Order[]>(response)
+  const response = await fetch(`${API_URL}/api/orders/restaurant/${restaurantId}`, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+  const result = await handleResponse<{ success: boolean; data: Order[] }>(response)
+  return result.data
 }
 
 // Update order status

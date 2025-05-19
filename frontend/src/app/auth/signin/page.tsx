@@ -21,11 +21,16 @@ export default function SignInPage() {
     setIsLoading(true)
 
     try {
-      const { token, restaurant } = await login(formData.email, formData.password)
-      localStorage.setItem('token', token)
-      localStorage.setItem('restaurantId', restaurant.id)
-      toast.success('Successfully signed in')
-      router.push('/admin/orders')
+      const response = await login(formData.email, formData.password)
+      if (response.success && response.data) {
+        localStorage.setItem('token', response.data.token)
+        localStorage.setItem('userId', response.data.user.id)
+        localStorage.setItem('restaurantId', response.data.user.restaurantId)
+        toast.success('Successfully signed in')
+        router.push('/admin/orders')
+      } else {
+        throw new Error('Invalid response format')
+      }
     } catch (error) {
       console.error('Sign in failed:', error)
       toast.error('Failed to sign in')

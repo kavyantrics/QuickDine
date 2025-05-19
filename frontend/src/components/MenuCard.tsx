@@ -1,5 +1,7 @@
+'use client'
+
 import { MenuItem } from '@/types'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/contexts/cart-context'
 import { toast } from 'sonner'
@@ -7,14 +9,14 @@ import Image from 'next/image'
 
 interface MenuCardProps {
   item: MenuItem
-  onAddToCart: () => void
 }
 
-export function MenuCard({ item, onAddToCart }: MenuCardProps) {
+export function MenuCard({ item }: MenuCardProps) {
   const { addItem } = useCart()
 
   const handleAddToCart = () => {
     addItem(item)
+    console.log('Added to cart:', item)
     toast.success(`${item.name} added to cart`)
   }
 
@@ -25,7 +27,10 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
           <Image
             src={item.image}
             alt={item.name}
-            className="object-cover w-full h-full rounded-t-lg"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover rounded-t-lg"
+            priority={false}
           />
         </div>
       )}
@@ -36,10 +41,10 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
         )}
       </CardHeader>
       <CardContent className="mt-auto">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-2">
           <span className="text-lg font-semibold">${item.price.toFixed(2)}</span>
           <Button
-            onClick={onAddToCart || handleAddToCart}
+            onClick={handleAddToCart}
             disabled={!item.isAvailable}
             size="sm"
             className="w-full"
@@ -48,13 +53,6 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
           </Button>
         </div>
       </CardContent>
-      <CardFooter>
-        {item.description && (
-          <p className="text-sm text-muted-foreground">
-            {item.description}
-          </p>
-        )}
-      </CardFooter>
     </Card>
   )
 } 
