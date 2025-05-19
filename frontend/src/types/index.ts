@@ -21,8 +21,10 @@ export interface Order {
     menuItem: MenuItem
     quantity: number
   }[]
-  total: number
+  total?: number
+  totalAmount?: number
   createdAt: string
+  table?: Table
 }
 
 export interface Restaurant {
