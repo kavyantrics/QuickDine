@@ -2,13 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getOrders } from '@/lib/api'
+import { getOrders, updateOrderStatus } from '@/lib/api'
 import { Order } from '@/types'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { usePusher } from '@/contexts/pusher-context'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function OrdersPage() {
   const router = useRouter()
+  const { pusher } = usePusher()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [generatingBillId, setGeneratingBillId] = useState<string | null>(null)
@@ -23,11 +32,7 @@ export default function OrdersPage() {
           return
         }
         const response = await getOrders(restaurantId)
-        const mapped = response.map(order => ({
-          ...order,
-          total: order.total ?? order.totalAmount ?? 0,
-        }))
-        setOrders(mapped)
+        setOrders(response)
       } catch (error) {
         console.error('Failed to fetch orders:', error)
         toast.error('Failed to fetch orders')
@@ -39,6 +44,60 @@ export default function OrdersPage() {
     fetchOrders()
   }, [router])
 
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!pusher) return
+    
+    const restaurantId = localStorage.getItem('restaurantId')
+    if (!restaurantId) return
+
+    const channel = pusher.subscribe(`restaurant-${restaurantId}`)
+    
+    channel.bind('order-created', (newOrder: Order) => {
+      setOrders(prev => [newOrder, ...prev])
+      toast.success('New order received!')
+    })
+
+    channel.bind('order-updated', (updatedOrder: Order) => {
+      setOrders(prev => prev.map(order => 
+        order.id === updatedOrder.id ? updatedOrder : order
+      ))
+      toast.info('Order updated!')
+    })
+
+    channel.bind('order-status-updated', (data: { orderId: string, status: Order['status'] }) => {
+      setOrders(prev => prev.map(order => 
+        order.id === data.orderId ? { ...order, status: data.status } : order
+      ))
+      toast.info('Order status updated!')
+    })
+
+    return () => {
+      channel.unbind_all()
+      channel.unsubscribe()
+    }
+  }, [pusher])
+
+  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      // Update local state immediately
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, status: newStatus } : order
+      ))
+      
+      // Make API call
+      await updateOrderStatus(orderId, newStatus)
+      toast.success('Order status updated')
+    } catch (error) {
+      // Revert the state if API call fails
+      setOrders(prev => prev.map(order => 
+        order.id === orderId ? { ...order, status: order.status } : order
+      ))
+      console.error('Failed to update order status:', error)
+      toast.error('Failed to update order status')
+    }
+  }
+
   const handleGenerateBill = (order: Order) => {
     setGeneratingBillId(order.id)
     printBill(order)
@@ -49,8 +108,8 @@ export default function OrdersPage() {
   }
 
   function printBill(order: Order) {
-    const billWindow = window.open('', '_blank', 'width=600,height=800');
-    if (!billWindow) return;
+    const billWindow = window.open('', '_blank', 'width=600,height=800')
+    if (!billWindow) return
 
     const billHtml = `
       <html>
@@ -95,12 +154,12 @@ export default function OrdersPage() {
           <div style="margin-top:2rem;">Thank you for dining with us!</div>
         </body>
       </html>
-    `;
+    `
 
-    billWindow.document.write(billHtml);
-    billWindow.document.close();
-    billWindow.focus();
-    billWindow.print();
+    billWindow.document.write(billHtml)
+    billWindow.document.close()
+    billWindow.focus()
+    billWindow.print()
   }
 
   if (isLoading) {
@@ -141,11 +200,29 @@ export default function OrdersPage() {
                   ${((order.total ?? order.totalAmount ?? 0).toFixed(2))}
                 </span>
               </div>
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" onClick={() => handleGenerateBill(order)} disabled={generatingBillId === order.id}>
+              <div className="flex flex-col gap-2 mt-4">
+                <Select
+                  value={order.status}
+                  onValueChange={(value: Order['status']) => handleStatusChange(order.id, value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Update Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="preparing">Preparing</SelectItem>
+                    <SelectItem value="ready">Ready</SelectItem>
+                    <SelectItem value="served">Served</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleGenerateBill(order)} 
+                  disabled={generatingBillId === order.id}
+                >
                   {generatingBillId === order.id ? 'Generating...' : 'Generate Bill'}
                 </Button>
-                {/* Add more admin actions here, e.g., mark as paid, print, etc. */}
               </div>
             </div>
           ))
@@ -153,4 +230,4 @@ export default function OrdersPage() {
       </div>
     </div>
   )
-} 
+}

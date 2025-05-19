@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { pusher } from '@/lib/pusher'
+import { usePusher as usePusherContext } from '@/contexts/pusher-context'
 import { Order } from '@/types'
 
 interface UsePusherProps {
@@ -9,14 +9,17 @@ interface UsePusherProps {
 }
 
 export function usePusher({ channel, event, onEvent }: UsePusherProps) {
-  useEffect(() => {
-    const pusherChannel = pusher.subscribe(channel)
+  const { pusher, isConnected } = usePusherContext()
 
+  useEffect(() => {
+    if (!pusher || !isConnected) return
+
+    const pusherChannel = pusher.subscribe(channel)
     pusherChannel.bind(event, onEvent)
 
     return () => {
       pusherChannel.unbind(event, onEvent)
       pusher.unsubscribe(channel)
     }
-  }, [channel, event, onEvent])
+  }, [pusher, isConnected, channel, event, onEvent])
 } 

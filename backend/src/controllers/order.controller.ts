@@ -26,8 +26,8 @@ const OrderInputSchema = z.object({
   }))
 })
 
-const UpdateOrderStatusSchema = z.object({
-  status: z.enum(['pending', 'preparing', 'served', 'cancelled'])
+const OrderStatusSchema = z.object({
+  status: z.enum(['pending', 'preparing', 'ready', 'served', 'cancelled']).transform(val => val.toLowerCase())
 })
 
 export const orderController = {
@@ -43,7 +43,7 @@ export const orderController = {
       })
 
       const totalAmount = orderData.items.reduce((total, item) => {
-        const menuItem = menuItems.find(mi => mi.id === item.menuItemId)
+        const menuItem = menuItems.find((mi: { id: string }) => mi.id === item.menuItemId)
         return total + (menuItem?.price || 0) * item.quantity
       }, 0)
 
@@ -61,7 +61,7 @@ export const orderController = {
               quantity: item.quantity,
               notes: item.notes,
               menuItemId: item.menuItemId,
-              price: menuItems.find(mi => mi.id === item.menuItemId)?.price || 0
+              price: menuItems.find((mi: { id: string }) => mi.id === item.menuItemId)?.price || 0
             }))
           }
         },
@@ -82,8 +82,8 @@ export const orderController = {
 
       res.status(201).json({ success: true, data: order })
     } catch (error) {
-      console.log("🚀 ~ createOrder: ~ error:", error)
-      next(error)
+      console.error('Error creating order:', error)
+      res.status(500).json({ error: 'Failed to create order' })
     }
   },
 
@@ -105,7 +105,8 @@ export const orderController = {
       })
       res.json({ success: true, data: orders })
     } catch (error) {
-      next(error)
+      console.error('Error fetching orders:', error)
+      res.status(500).json({ error: 'Failed to fetch orders' })
     }
   },
 
@@ -138,7 +139,7 @@ export const orderController = {
   updateOrderStatus: async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params
-      const { status } = UpdateOrderStatusSchema.parse(req.body)
+      const { status } = OrderStatusSchema.parse(req.body)
 
       const order = await prisma.order.update({
         where: { id },
@@ -153,14 +154,18 @@ export const orderController = {
         }
       })
 
-      await pusher.trigger(`restaurant-${order.restaurantId}`, 'order-updated', {
-        order,
-        message: `Order #${order.orderNumber} status updated to ${status}`
+      await pusher.trigger(`restaurant-${order.restaurantId}`, 'order-status-updated', {
+        orderId: order.id,
+        status: order.status,
+        orderNumber: order.orderNumber,
+        tableNumber: order.table.number,
+        message: `Order #${order.orderNumber} status updated to ${order.status}`
       })
 
       res.json({ success: true, data: order })
     } catch (error) {
-      next(error)
+      console.error('Error updating order status:', error)
+      res.status(500).json({ error: 'Failed to update order status' })
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction, RequestHandler } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import { prisma } from '../utils/db'
 import { z } from 'zod'
 import bcrypt from 'bcrypt'
@@ -22,8 +22,36 @@ const RestaurantRegistrationSchema = z.object({
   adminPassword: z.string().min(8, 'Password must be at least 8 characters')
 })
 
+const RestaurantSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+  description: z.string().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  logo: z.string().optional(),
+})
+
+const CreateRestaurantSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  logo: z.string().optional(),
+  address: z.string().min(1),
+  phone: z.string().min(1),
+  email: z.string().email(),
+  userId: z.string().min(1)
+})
+
+const UpdateRestaurantSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  logo: z.string().optional(),
+  address: z.string().min(1).optional(),
+  phone: z.string().min(1).optional(),
+  email: z.string().email().optional()
+})
+
 export const restaurantController = {
-  register: (async (req: Request, res: Response, next: NextFunction) => {
+  register: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = RestaurantRegistrationSchema.parse(req.body)
       
@@ -55,7 +83,7 @@ export const restaurantController = {
       const hashedPassword = await bcrypt.hash(data.adminPassword, 10)
 
       // Create restaurant and admin user in a transaction
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx:any) => {
         // Create restaurant
         const restaurant = await tx.restaurant.create({
           data: {
@@ -128,9 +156,9 @@ export const restaurantController = {
     } catch (error) {
       next(error)
     }
-  }) as RequestHandler,
+  },
 
-  getMenu: (async (req: Request, res: Response, next: NextFunction) => {
+  getMenu: async (req: Request, res: Response) => {
     try {
       const { restaurantId, tableId } = req.query
 
@@ -138,51 +166,6 @@ export const restaurantController = {
         return res.status(400).json({
           success: false,
           error: 'Restaurant ID and Table ID are required'
-        })
-      }
-
-      // For development/testing, if using test IDs, return sample menu items
-      if (restaurantId === 'admin' && tableId === 'menu') {
-        return res.json({
-          success: true,
-          data: [
-            {
-              id: '1',
-              name: 'Margherita Pizza',
-              description: 'Classic tomato sauce, mozzarella, and basil',
-              price: 12.99,
-              category: 'Pizza',
-              image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3',
-              isAvailable: true,
-              restaurantId: 'admin',
-              createdAt: new Date(),
-              updatedAt: new Date()
-            },
-            {
-              id: '2',
-              name: 'Caesar Salad',
-              description: 'Romaine lettuce, croutons, parmesan, and Caesar dressing',
-              price: 8.99,
-              category: 'Salads',
-              image: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9',
-              isAvailable: true,
-              restaurantId: 'admin',
-              createdAt: new Date(),
-              updatedAt: new Date()
-            },
-            {
-              id: '3',
-              name: 'Chocolate Cake',
-              description: 'Rich chocolate cake with ganache frosting',
-              price: 6.99,
-              category: 'Desserts',
-              image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587',
-              isAvailable: true,
-              restaurantId: 'admin',
-              createdAt: new Date(),
-              updatedAt: new Date()
-            }
-          ]
         })
       }
 
@@ -217,7 +200,63 @@ export const restaurantController = {
         data: menuItems
       })
     } catch (error) {
-      next(error)
+      console.error('Error fetching menu:', error)
+      res.status(500).json({ error: 'Failed to fetch menu' })
     }
-  }) as RequestHandler
+  },
+
+  createRestaurant: async (req: Request, res: Response) => {
+    try {
+      const data = CreateRestaurantSchema.parse(req.body)
+      const restaurant = await prisma.restaurant.create({
+        data: {
+          ...data,
+          users: {
+            connect: { id: data.userId }
+          }
+        }
+      })
+      res.status(201).json({ success: true, data: restaurant })
+    } catch (error) {
+      console.error('Error creating restaurant:', error)
+      res.status(500).json({ error: 'Failed to create restaurant' })
+    }
+  },
+
+  getRestaurant: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params
+      const restaurant = await prisma.restaurant.findUnique({
+        where: { id },
+        include: {
+          users: true,
+          menuItems: true,
+          tables: true
+        }
+      })
+      if (!restaurant) {
+        res.status(404).json({ error: 'Restaurant not found' })
+        return
+      }
+      res.json({ success: true, data: restaurant })
+    } catch (error) {
+      console.error('Error fetching restaurant:', error)
+      res.status(500).json({ error: 'Failed to fetch restaurant' })
+    }
+  },
+
+  updateRestaurant: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params
+      const data = UpdateRestaurantSchema.parse(req.body)
+      const restaurant = await prisma.restaurant.update({
+        where: { id },
+        data
+      })
+      res.json({ success: true, data: restaurant })
+    } catch (error) {
+      console.error('Error updating restaurant:', error)
+      res.status(500).json({ error: 'Failed to update restaurant' })
+    }
+  }
 }
