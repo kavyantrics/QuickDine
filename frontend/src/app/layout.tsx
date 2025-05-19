@@ -22,7 +22,7 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <PusherProvider>
           <CartProvider>
-            {children}
+        {children}
             <Toaster />
           </CartProvider>
         </PusherProvider>

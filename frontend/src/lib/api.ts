@@ -35,6 +35,21 @@ interface OrderData {
   }[]
 }
 
+interface AnalyticsData {
+  totalOrdersThisMonth: number
+  revenuePerDay: Array<{
+    date: string
+    revenue: number
+  }>
+  topItems: Array<{
+    id: string
+    name: string
+    price: number
+    category: string
+    totalQuantity: number
+  }>
+}
+
 // Helper function to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -185,4 +200,14 @@ export async function deleteMenuItem(
   if (!response.ok) {
     throw new Error('Failed to delete menu item')
   }
+}
+
+export async function fetchAnalytics(restaurantId: string): Promise<AnalyticsData> {
+  const response = await fetch(`${API_URL}/api/analytics/${restaurantId}`)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch analytics')
+  }
+
+  return response.json()
 } 
