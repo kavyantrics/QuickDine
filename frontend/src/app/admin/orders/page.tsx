@@ -14,13 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Printer, Download } from 'lucide-react'
 
 export default function OrdersPage() {
   const router = useRouter()
   const { pusher, isConnected } = usePusher()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [generatingBillId, setGeneratingBillId] = useState<string | null>(null)
+  const [selectedBill, setSelectedBill] = useState<Order | null>(null)
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -121,48 +128,110 @@ export default function OrdersPage() {
   }
 
   const handleGenerateBill = (order: Order) => {
-    setGeneratingBillId(order.id)
-    printBill(order)
-    setTimeout(() => {
-      toast.success(`Bill generated for Order #${order.id}`)
-      setGeneratingBillId(null)
-    }, 1000)
+    setSelectedBill(order)
   }
 
-  function printBill(order: Order) {
+  const handlePrintBill = () => {
+    if (!selectedBill) return
+
     const billWindow = window.open('', '_blank', 'width=600,height=800')
     if (!billWindow) return
 
     const billHtml = `
       <html>
         <head>
-          <title>Bill for Order #${order.id}</title>
+          <title>Bill for Order #${selectedBill.id}</title>
           <style>
-            body { font-family: sans-serif; padding: 2rem; }
-            h2 { margin-bottom: 0.5rem; }
-            .items-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-            .items-table th, .items-table td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
-            .items-table th { background: #f5f5f5; }
-            .total { font-weight: bold; font-size: 1.2rem; margin-top: 1rem; }
+            @media print {
+              body { font-family: 'Courier New', monospace; }
+              .no-print { display: none; }
+            }
+            body { 
+              font-family: 'Courier New', monospace;
+              padding: 2rem;
+              max-width: 80mm;
+              margin: 0 auto;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 1rem;
+            }
+            .header h1 {
+              font-size: 1.2rem;
+              margin: 0;
+            }
+            .header p {
+              margin: 0.2rem 0;
+              font-size: 0.9rem;
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 0.5rem 0;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 1rem 0;
+              font-size: 0.9rem;
+            }
+            .items-table th {
+              text-align: left;
+              padding: 0.2rem 0;
+            }
+            .items-table td {
+              padding: 0.2rem 0;
+            }
+            .total {
+              font-weight: bold;
+              margin-top: 1rem;
+              text-align: right;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 2rem;
+              font-size: 0.9rem;
+            }
+            .print-button {
+              position: fixed;
+              top: 1rem;
+              right: 1rem;
+              padding: 0.5rem 1rem;
+              background: #007bff;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+            }
+            .print-button:hover {
+              background: #0056b3;
+            }
           </style>
         </head>
         <body>
-          <h2>QuickDine - Bill</h2>
-          <div><strong>Order #:</strong> ${order.id}</div>
-          <div><strong>Table #:</strong> ${order.table?.number ?? '?'}</div>
-          <div><strong>Customer:</strong> ${order.customerName}</div>
-          <div><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
+          <div class="header">
+            <h1>QuickDine</h1>
+            <p>Restaurant Bill</p>
+            <p>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+          </div>
+          <div class="divider"></div>
+          <div>
+            <p><strong>Order #:</strong> ${selectedBill.id}</p>
+            <p><strong>Table #:</strong> ${selectedBill.table?.number ?? '?'}</p>
+            <p><strong>Customer:</strong> ${selectedBill.customerName}</p>
+            <p><strong>Date:</strong> ${new Date(selectedBill.createdAt).toLocaleString()}</p>
+          </div>
+          <div class="divider"></div>
           <table class="items-table">
             <thead>
               <tr>
                 <th>Item</th>
                 <th>Qty</th>
                 <th>Price</th>
-                <th>Subtotal</th>
+                <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              ${order.items.map(item => `
+              ${selectedBill.items.map(item => `
                 <tr>
                   <td>${item.menuItem.name}</td>
                   <td>${item.quantity}</td>
@@ -172,8 +241,17 @@ export default function OrdersPage() {
               `).join('')}
             </tbody>
           </table>
-          <div class="total">Total: $${((order.total ?? order.totalAmount ?? 0).toFixed(2))}</div>
-          <div style="margin-top:2rem;">Thank you for dining with us!</div>
+          <div class="divider"></div>
+          <div class="total">
+            <p>Subtotal: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.9).toFixed(2)}</p>
+            <p>Tax (10%): $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.1).toFixed(2)}</p>
+            <p>Total: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0).toFixed(2))}</p>
+          </div>
+          <div class="footer">
+            <p>Thank you for dining with us!</p>
+            <p>Please visit again</p>
+          </div>
+          <button class="print-button no-print" onclick="window.print()">Print Bill</button>
         </body>
       </html>
     `
@@ -181,7 +259,42 @@ export default function OrdersPage() {
     billWindow.document.write(billHtml)
     billWindow.document.close()
     billWindow.focus()
-    billWindow.print()
+  }
+
+  const handleDownloadBill = () => {
+    if (!selectedBill) return
+
+    const billContent = `
+QuickDine - Restaurant Bill
+------------------------
+Order #: ${selectedBill.id}
+Table #: ${selectedBill.table?.number ?? '?'}
+Customer: ${selectedBill.customerName}
+Date: ${new Date(selectedBill.createdAt).toLocaleString()}
+
+Items:
+${selectedBill.items.map(item => 
+  `${item.menuItem.name} x${item.quantity} - $${(item.menuItem.price * item.quantity).toFixed(2)}`
+).join('\n')}
+
+------------------------
+Subtotal: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.9).toFixed(2)}
+Tax (10%): $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.1).toFixed(2)}
+Total: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0).toFixed(2))}
+
+Thank you for dining with us!
+Please visit again
+    `
+
+    const blob = new Blob([billContent], { type: 'text/plain' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `bill-${selectedBill.id}.txt`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
   }
 
   if (isLoading) {
@@ -240,16 +353,74 @@ export default function OrdersPage() {
                 </Select>
                 <Button 
                   variant="outline" 
-                  onClick={() => handleGenerateBill(order)} 
-                  disabled={generatingBillId === order.id}
+                  onClick={() => handleGenerateBill(order)}
+                  className="flex items-center gap-2"
                 >
-                  {generatingBillId === order.id ? 'Generating...' : 'Generate Bill'}
+                  <Printer className="w-4 h-4" />
+                  Generate Bill
                 </Button>
               </div>
             </div>
           ))
         )}
       </div>
+
+      <Dialog open={!!selectedBill} onOpenChange={() => setSelectedBill(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Bill Preview</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="text-center">
+              <h3 className="text-lg font-bold">QuickDine</h3>
+              <p className="text-sm text-gray-500">Restaurant Bill</p>
+            </div>
+            <div className="space-y-2">
+              <p><strong>Order #:</strong> {selectedBill?.id}</p>
+              <p><strong>Table #:</strong> {selectedBill?.table?.number ?? '?'}</p>
+              <p><strong>Customer:</strong> {selectedBill?.customerName}</p>
+              <p><strong>Date:</strong> {selectedBill && new Date(selectedBill.createdAt).toLocaleString()}</p>
+            </div>
+            <div className="border-t border-b py-2">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left">
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedBill?.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>{item.menuItem.name}</td>
+                      <td>{item.quantity}</td>
+                      <td>${item.menuItem.price.toFixed(2)}</td>
+                      <td>${(item.menuItem.price * item.quantity).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-right space-y-1">
+              <p>Subtotal: ${selectedBill && ((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.9).toFixed(2)}</p>
+              <p>Tax (10%): ${selectedBill && ((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.1).toFixed(2)}</p>
+              <p className="font-bold">Total: ${selectedBill && ((selectedBill.total ?? selectedBill.totalAmount ?? 0).toFixed(2))}</p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleDownloadBill} className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Download
+              </Button>
+              <Button onClick={handlePrintBill} className="flex items-center gap-2">
+                <Printer className="w-4 h-4" />
+                Print
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
