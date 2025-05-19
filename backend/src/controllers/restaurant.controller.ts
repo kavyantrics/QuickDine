@@ -128,5 +128,96 @@ export const restaurantController = {
     } catch (error) {
       next(error)
     }
+  }) as RequestHandler,
+
+  getMenu: (async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { restaurantId, tableId } = req.query
+
+      if (!restaurantId || !tableId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Restaurant ID and Table ID are required'
+        })
+      }
+
+      // For development/testing, if using test IDs, return sample menu items
+      if (restaurantId === 'admin' && tableId === 'menu') {
+        return res.json({
+          success: true,
+          data: [
+            {
+              id: '1',
+              name: 'Margherita Pizza',
+              description: 'Classic tomato sauce, mozzarella, and basil',
+              price: 12.99,
+              category: 'Pizza',
+              image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3',
+              isAvailable: true,
+              restaurantId: 'admin',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            },
+            {
+              id: '2',
+              name: 'Caesar Salad',
+              description: 'Romaine lettuce, croutons, parmesan, and Caesar dressing',
+              price: 8.99,
+              category: 'Salads',
+              image: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9',
+              isAvailable: true,
+              restaurantId: 'admin',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            },
+            {
+              id: '3',
+              name: 'Chocolate Cake',
+              description: 'Rich chocolate cake with ganache frosting',
+              price: 6.99,
+              category: 'Desserts',
+              image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587',
+              isAvailable: true,
+              restaurantId: 'admin',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          ]
+        })
+      }
+
+      // Verify table belongs to restaurant
+      const table = await prisma.table.findFirst({
+        where: {
+          id: tableId as string,
+          restaurantId: restaurantId as string
+        }
+      })
+
+      if (!table) {
+        return res.status(404).json({
+          success: false,
+          error: 'Table not found'
+        })
+      }
+
+      // Get menu items for the restaurant
+      const menuItems = await prisma.menuItem.findMany({
+        where: {
+          restaurantId: restaurantId as string,
+          isAvailable: true
+        },
+        orderBy: {
+          category: 'asc'
+        }
+      })
+
+      res.json({
+        success: true,
+        data: menuItems
+      })
+    } catch (error) {
+      next(error)
+    }
   }) as RequestHandler
 }

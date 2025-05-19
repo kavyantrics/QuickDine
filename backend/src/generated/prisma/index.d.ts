@@ -1110,7 +1110,7 @@ export namespace Prisma {
     /**
      * The default values for transactionOptions
      * maxWait ?= 2000
-     * timeout ?= 5000
+     * timeout ?= 8000
      */
     transactionOptions?: {
       maxWait?: number
