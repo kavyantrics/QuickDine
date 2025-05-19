@@ -9,9 +9,48 @@ async function main() {
     data: {
       name: 'Sample Restaurant',
       email: 'sample@restaurant.com',
-      description: 'A sample restaurant with delicious food',
-      address: '123 Food Street, Foodville',
-      phone: '+1234567890'
+      description: 'A sample restaurant for testing',
+      address: '123 Test St',
+      phone: '123-456-7890',
+      tables: {
+        create: {
+          number: 1,
+          capacity: 4,
+          qrCode: 'sample-table-1'
+        }
+      },
+      menuItems: {
+        create: [
+          {
+            name: 'Margherita Pizza',
+            description: 'Classic tomato sauce, mozzarella, and basil',
+            price: 12.99,
+            category: 'MAIN_COURSE',
+            isAvailable: true
+          },
+          {
+            name: 'Caesar Salad',
+            description: 'Romaine lettuce, croutons, parmesan, and Caesar dressing',
+            price: 8.99,
+            category: 'STARTER',
+            isAvailable: true
+          },
+          {
+            name: 'Chocolate Cake',
+            description: 'Rich chocolate cake with ganache',
+            price: 6.99,
+            category: 'DESSERT',
+            isAvailable: true
+          },
+          {
+            name: 'Cola',
+            description: 'Refreshing cola drink',
+            price: 2.99,
+            category: 'DRINKS',
+            isAvailable: true
+          }
+        ]
+      }
     }
   })
 
@@ -28,7 +67,7 @@ async function main() {
   })
 
   // Create sample tables
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 2; i <= 10; i++) {
     await prisma.table.create({
       data: {
         number: i,
@@ -42,7 +81,7 @@ async function main() {
   // Define menu categories and items
   const categories = [
     {
-      name: 'Pizza',
+      name: 'MAIN_COURSE' as const,
       items: [
         {
           name: 'Margherita Pizza',
@@ -59,7 +98,7 @@ async function main() {
       ]
     },
     {
-      name: 'Pasta',
+      name: 'MAIN_COURSE' as const,
       items: [
         {
           name: 'Pasta Alfredo',
@@ -76,7 +115,7 @@ async function main() {
       ]
     },
     {
-      name: 'Beverages',
+      name: 'DRINKS' as const,
       items: [
         {
           name: 'Fresh Lemonade',

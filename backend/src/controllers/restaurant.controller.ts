@@ -50,6 +50,19 @@ const UpdateRestaurantSchema = z.object({
   email: z.string().email().optional()
 })
 
+// Menu item validation schemas
+const MenuItemSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  price: z.number().positive('Price must be positive'),
+  category: z.enum(['STARTERS', 'MAIN_COURSE', 'DRINKS', 'DESSERTS', 'SIDES', 'SNACKS', 'BREAKFAST', 'LUNCH', 'DINNER']),
+  image: z.string().optional(),
+  isAvailable: z.boolean().default(true),
+  restaurantId: z.string()
+})
+
+const UpdateMenuItemSchema = MenuItemSchema.partial().omit({ restaurantId: true })
+
 export const restaurantController = {
   register: async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -257,6 +270,47 @@ export const restaurantController = {
     } catch (error) {
       console.error('Error updating restaurant:', error)
       res.status(500).json({ error: 'Failed to update restaurant' })
+    }
+  },
+
+  createMenuItem: async (req: Request, res: Response) => {
+    try {
+      const data = MenuItemSchema.parse(req.body)
+      const menuItem = await prisma.menuItem.create({
+        data
+      })
+      res.status(201).json({ success: true, data: menuItem })
+    } catch (error) {
+      console.error('Error creating menu item:', error)
+      res.status(500).json({ error: 'Failed to create menu item' })
+    }
+  },
+
+  updateMenuItem: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params
+      const data = UpdateMenuItemSchema.parse(req.body)
+      const menuItem = await prisma.menuItem.update({
+        where: { id },
+        data
+      })
+      res.json({ success: true, data: menuItem })
+    } catch (error) {
+      console.error('Error updating menu item:', error)
+      res.status(500).json({ error: 'Failed to update menu item' })
+    }
+  },
+
+  deleteMenuItem: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params
+      await prisma.menuItem.delete({
+        where: { id }
+      })
+      res.json({ success: true, message: 'Menu item deleted successfully' })
+    } catch (error) {
+      console.error('Error deleting menu item:', error)
+      res.status(500).json({ error: 'Failed to delete menu item' })
     }
   }
 }

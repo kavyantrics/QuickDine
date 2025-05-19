@@ -50,6 +50,12 @@ interface AnalyticsData {
   }>
 }
 
+interface ApiResponse<T> {
+  success: boolean
+  data: T
+  error?: string
+}
+
 // Helper function to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -64,7 +70,7 @@ export async function getMenu(restaurantId: string, tableId: string): Promise<Me
   const response = await fetch(
     `${API_URL}/api/restaurants/menu?restaurantId=${restaurantId}&tableId=${tableId}`
   )
-  const result = await handleResponse<{ success: boolean; data: MenuItem[] }>(response)
+  const result = await handleResponse<ApiResponse<MenuItem[]>>(response)
   return result.data
 }
 
@@ -155,7 +161,7 @@ export async function updateRestaurant(
 // Add menu item
 export async function addMenuItem(
   restaurantId: string,
-  data: Omit<MenuItem, 'id'>
+  data: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<MenuItem> {
   const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/menu`, {
     method: 'POST',
@@ -164,14 +170,15 @@ export async function addMenuItem(
     },
     body: JSON.stringify(data),
   })
-  return handleResponse<MenuItem>(response)
+  const result = await handleResponse<ApiResponse<MenuItem>>(response)
+  return result.data
 }
 
 // Update menu item
 export async function updateMenuItem(
   restaurantId: string,
   menuItemId: string,
-  data: Partial<MenuItem>
+  data: Partial<Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<MenuItem> {
   const response = await fetch(
     `${API_URL}/api/restaurants/${restaurantId}/menu/${menuItemId}`,
@@ -183,7 +190,8 @@ export async function updateMenuItem(
       body: JSON.stringify(data),
     }
   )
-  return handleResponse<MenuItem>(response)
+  const result = await handleResponse<ApiResponse<MenuItem>>(response)
+  return result.data
 }
 
 // Delete menu item

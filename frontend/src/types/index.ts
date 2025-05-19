@@ -1,11 +1,16 @@
+import { MenuCategory } from '@/lib/constants'
+
 export interface MenuItem {
   id: string
   name: string
-  description: string | null
+  description: string
   price: number
-  category: string
-  image: string | null
+  category: MenuCategory
+  image: string
   isAvailable: boolean
+  restaurantId: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface CartItem extends MenuItem {
@@ -14,25 +19,29 @@ export interface CartItem extends MenuItem {
 
 export interface Order {
   id: string
-  status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED'
+  restaurantId: string
+  tableId: string
   customerName: string
   customerPhone: string
   items: {
-    menuItem: MenuItem
+    menuItemId: string
     quantity: number
   }[]
-  total?: number
-  totalAmount?: number
-  createdAt: string
-  table?: Table
+  status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+  total: number
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Restaurant {
   id: string
   name: string
-  address: string | null
-  phone: string | null
-}
+  email: string
+  address?: string
+  phone?: string
+  createdAt: Date
+  updatedAt: Date
+} 
 
 export interface Table {
   id: string
