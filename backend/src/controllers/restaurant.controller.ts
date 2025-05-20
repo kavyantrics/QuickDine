@@ -66,37 +66,38 @@ const UpdateMenuItemSchema = MenuItemSchema.partial().omit({ restaurantId: true 
 export const restaurantController = {
   register: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = RestaurantRegistrationSchema.parse(req.body)
-      
+      const { userId } = req.params;
+      const data = RestaurantRegistrationSchema.parse(req.body);
+
       // Check if restaurant email already exists
       const existingRestaurant = await prisma.restaurant.findUnique({
         where: { email: data.email }
-      })
+      });
 
       if (existingRestaurant) {
         return res.status(400).json({
           success: false,
           error: 'Restaurant with this email already exists'
-        })
+        });
       }
 
       // Check if admin email already exists
       const existingAdmin = await prisma.user.findUnique({
         where: { email: data.adminEmail }
-      })
+      });
 
       if (existingAdmin) {
         return res.status(400).json({
           success: false,
           error: 'Admin email already registered'
-        })
+        });
       }
 
       // Hash admin password
-      const hashedPassword = await bcrypt.hash(data.adminPassword, 10)
+      const hashedPassword = await bcrypt.hash(data.adminPassword, 10);
 
       // Create restaurant and admin user in a transaction
-      const result = await prisma.$transaction(async (tx:any) => {
+      const result = await prisma.$transaction(async (tx: any) => {
         // Create restaurant
         const restaurant = await tx.restaurant.create({
           data: {
@@ -105,9 +106,12 @@ export const restaurantController = {
             description: data.description,
             address: data.address,
             phone: data.phone,
-            logo: data.logo
+            logo: data.logo,
+            users: {
+              connect: { id: userId } // Connect the userId from params
+            }
           }
-        })
+        });
 
         // Create admin user
         const admin = await tx.user.create({
@@ -118,7 +122,7 @@ export const restaurantController = {
             role: 'admin',
             restaurantId: restaurant.id
           }
-        })
+        });
 
         // Create tables
         const tables = await Promise.all(
@@ -127,22 +131,22 @@ export const restaurantController = {
               data: {
                 number: i + 1,
                 capacity: data.tableCapacity,
-                qrCode: `${restaurant.id}-table-${i + 1}`, // Simple QR code format
+                qrCode: `${restaurant.id}-table-${i + 1}`,
                 restaurantId: restaurant.id
               }
             })
           ))
-        )
+        );
 
-        return { restaurant, admin, tables }
-      })
+        return { restaurant, admin, tables };
+      });
 
       // Generate JWT for admin
       const token = jwt.sign(
         { userId: result.admin.id, role: 'admin' },
         process.env.JWT_SECRET!,
         { expiresIn: '24h' }
-      )
+      );
 
       res.status(201).json({
         success: true,
@@ -165,9 +169,9 @@ export const restaurantController = {
           },
           token
         }
-      })
+      });
     } catch (error) {
-      next(error)
+      next(error);
     }
   },
 
@@ -220,12 +224,13 @@ export const restaurantController = {
 
   createRestaurant: async (req: Request, res: Response) => {
     try {
+      const { userId } = req.params
       const data = CreateRestaurantSchema.parse(req.body)
       const restaurant = await prisma.restaurant.create({
         data: {
           ...data,
           users: {
-            connect: { id: data.userId }
+            connect: { id: userId }
           }
         }
       })
@@ -238,9 +243,12 @@ export const restaurantController = {
 
   getRestaurant: async (req: Request, res: Response) => {
     try {
-      const { id } = req.params
-      const restaurant = await prisma.restaurant.findUnique({
-        where: { id },
+      const { userId, restaurantId } = req.params
+      const restaurant = await prisma.restaurant.findFirst({
+        where: {
+          id: restaurantId,
+          users: { some: { id: userId } }
+        },
         include: {
           users: true,
           menuItems: true,
@@ -248,8 +256,7 @@ export const restaurantController = {
         }
       })
       if (!restaurant) {
-        res.status(404).json({ error: 'Restaurant not found' })
-        return
+        return res.status(404).json({ error: 'Restaurant not found for this user' })
       }
       res.json({ success: true, data: restaurant })
     } catch (error) {
@@ -260,12 +267,18 @@ export const restaurantController = {
 
   updateRestaurant: async (req: Request, res: Response) => {
     try {
-      const { id } = req.params
+      const { userId, restaurantId } = req.params
       const data = UpdateRestaurantSchema.parse(req.body)
-      const restaurant = await prisma.restaurant.update({
-        where: { id },
+      const restaurant = await prisma.restaurant.updateMany({
+        where: {
+          id: restaurantId,
+          users: { some: { id: userId } }
+        },
         data
       })
+      if (restaurant.count === 0) {
+        return res.status(404).json({ error: 'Restaurant not found or not owned by user' })
+      }
       res.json({ success: true, data: restaurant })
     } catch (error) {
       console.error('Error updating restaurant:', error)

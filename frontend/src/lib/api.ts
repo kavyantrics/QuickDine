@@ -138,24 +138,37 @@ export async function updateOrderStatus(
 }
 
 // Get restaurant details
-export async function getRestaurant(restaurantId: string): Promise<Restaurant> {
-  const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`)
-  return handleResponse<Restaurant>(response)
+export async function getRestaurant(userId: string, restaurantId: string): Promise<Restaurant> {
+  const response = await fetch(`${API_URL}/api/restaurants/user/${userId}/restaurant/${restaurantId}`);
+  if (!response.ok) throw new Error('Failed to fetch restaurant');
+  const result = await response.json();
+  return result.data;
 }
 
 // Update restaurant details
 export async function updateRestaurant(
+  userId: string,
   restaurantId: string,
-  data: Partial<Restaurant>
-): Promise<Restaurant> {
-  const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
-  return handleResponse<Restaurant>(response)
+  data: Partial<{
+    name: string
+    address: string
+    phone: string
+    description: string
+    logo: string
+    email: string
+  }>
+) {
+  const response = await fetch(
+    `${API_URL}/api/restaurants/user/${userId}/restaurant/${restaurantId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }
+  )
+  if (!response.ok) throw new Error('Failed to update restaurant')
+  const result = await response.json()
+  return result.data
 }
 
 // Add menu item
@@ -241,6 +254,30 @@ export async function updateUser(
     }
   )
   if (!response.ok) throw new Error('Failed to update user')
+  const result = await response.json()
+  return result.data
+}
+
+// Create restaurant
+export async function createRestaurant(userId: string, data: any) {
+  const response = await fetch(`${API_URL}/api/restaurants/user/${userId}/restaurant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('Failed to create restaurant')
+  const result = await response.json()
+  return result.data
+}
+
+// Register restaurant (if needed)
+export async function registerRestaurant(userId: string, data: any) {
+  const response = await fetch(`${API_URL}/api/restaurants/user/${userId}/restaurant/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('Failed to register restaurant')
   const result = await response.json()
   return result.data
 } 
