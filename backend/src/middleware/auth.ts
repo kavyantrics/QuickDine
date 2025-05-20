@@ -1,10 +1,25 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import bcrypt from 'bcrypt'
 
 interface JwtPayload {
   userId: string
   restaurantId: string
   email: string
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  // Use a higher salt round for better security
+  return bcrypt.hash(password, 12)
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash)
+}
+
+export function isStrongPassword(password: string): boolean {
+  // At least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/.test(password)
 }
 
 declare global {

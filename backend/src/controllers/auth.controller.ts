@@ -4,6 +4,7 @@ import { z } from 'zod'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { UserRole } from '@prisma/client'
+import { hashPassword, verifyPassword, isStrongPassword } from '../middleware/auth'
 
 // Validation schemas
 const SignupSchema = z.object({
@@ -19,11 +20,44 @@ const LoginSchema = z.object({
   password: z.string()
 })
 
+const REFRESH_TOKEN_EXPIRY = '7d'
+const ACCESS_TOKEN_EXPIRY = '15m'
+
+function generateAccessToken(user: any) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      role: user.role,
+      restaurantId: user.restaurantId
+    },
+    process.env.JWT_SECRET!,
+    { expiresIn: ACCESS_TOKEN_EXPIRY }
+  )
+}
+
+function generateRefreshToken(user: any) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      tokenType: 'refresh'
+    },
+    process.env.JWT_REFRESH_SECRET!,
+    { expiresIn: REFRESH_TOKEN_EXPIRY }
+  )
+}
+
 export const authController = {
   // User signup
   signup: (async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userData = SignupSchema.parse(req.body)
+
+      if (!isStrongPassword(userData.password)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.'
+        })
+      }
 
       // Check if user already exists
       const existingUser = await prisma.user.findUnique({
@@ -38,7 +72,7 @@ export const authController = {
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(userData.password, 10)
+      const hashedPassword = await hashPassword(userData.password)
 
       // Create user
       const user = await prisma.user.create({
@@ -51,16 +85,17 @@ export const authController = {
         }
       })
 
-      // Generate JWT
-      const token = jwt.sign(
-        { 
-          userId: user.id, 
-          role: user.role,
-          restaurantId: user.restaurantId 
-        },
-        process.env.JWT_SECRET!,
-        { expiresIn: '24h' }
-      )
+      // Generate tokens
+      const accessToken = generateAccessToken(user)
+      const refreshToken = generateRefreshToken(user)
+      // Store refresh token in DB (session)
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          sessionToken: refreshToken,
+          expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      })
 
       res.status(201).json({
         success: true,
@@ -72,7 +107,8 @@ export const authController = {
             role: user.role,
             restaurantId: user.restaurantId
           },
-          token
+          accessToken,
+          refreshToken
         }
       })
     } catch (error) {
@@ -105,7 +141,7 @@ export const authController = {
       }
 
       // Verify password
-      const isValidPassword = await bcrypt.compare(password, user.password)
+      const isValidPassword = await verifyPassword(password, user.password)
 
       if (!isValidPassword) {
         return res.status(401).json({
@@ -114,16 +150,17 @@ export const authController = {
         })
       }
 
-      // Generate JWT
-      const token = jwt.sign(
-        { 
-          userId: user.id, 
-          role: user.role,
-          restaurantId: user.restaurantId 
-        },
-        process.env.JWT_SECRET!,
-        { expiresIn: '24h' }
-      )
+      // Generate tokens
+      const accessToken = generateAccessToken(user)
+      const refreshToken = generateRefreshToken(user)
+      // Store refresh token in DB (session)
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          sessionToken: refreshToken,
+          expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      })
 
       res.json({
         success: true,
@@ -140,13 +177,43 @@ export const authController = {
               role: ro.role
             }))
           },
-          token
+          accessToken,
+          refreshToken
         }
       })
     } catch (error) {
       next(error)
     }
   }) as RequestHandler,
+
+  // Refresh token endpoint
+  refresh: async (req: Request, res: Response) => {
+    const { refreshToken } = req.body
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, error: 'Refresh token required' })
+    }
+    try {
+      // Verify refresh token
+      const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any
+      // Check if session exists and is valid
+      const session = await prisma.session.findUnique({
+        where: { sessionToken: refreshToken }
+      })
+      if (!session || !session.isValid) {
+        return res.status(401).json({ success: false, error: 'Invalid refresh token' })
+      }
+      // Get user
+      const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'User not found' })
+      }
+      // Generate new access token
+      const accessToken = generateAccessToken(user)
+      res.json({ success: true, data: { accessToken } })
+    } catch (error) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' })
+    }
+  },
 
   // PATCH /api/users/:id
   updateUser: async (req: Request, res: Response) => {

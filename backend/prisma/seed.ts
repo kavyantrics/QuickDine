@@ -1,7 +1,21 @@
 import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import { hashPassword } from '../src/middleware/auth'
 
 const prisma = new PrismaClient()
+
+const REFRESH_TOKEN_EXPIRY = '7d'
+
+function generateRefreshToken(user: any) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      tokenType: 'refresh'
+    },
+    process.env.JWT_REFRESH_SECRET!,
+    { expiresIn: REFRESH_TOKEN_EXPIRY }
+  )
+}
 
 async function main() {
   // Create a sample restaurant
@@ -55,14 +69,23 @@ async function main() {
   })
 
   // Create an admin user
-  const hashedPassword = await bcrypt.hash('admin123', 10)
-  await prisma.user.create({
+  const hashedPassword = await hashPassword('Admin123!')
+  const adminUser = await prisma.user.create({
     data: {
       name: 'Admin User',
       email: 'admin@restaurant.com',
       password: hashedPassword,
       role: 'RESTAURANT_ADMIN',
       restaurantId: restaurant.id
+    }
+  })
+  // Create a refresh token and session for admin
+  const refreshToken = generateRefreshToken(adminUser)
+  await prisma.session.create({
+    data: {
+      userId: adminUser.id,
+      sessionToken: refreshToken,
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     }
   })
 
