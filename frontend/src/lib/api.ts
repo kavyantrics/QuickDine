@@ -292,14 +292,7 @@ export async function updateUser(
 }
 
 // Create restaurant
-export async function createRestaurant(userId: string, data: Partial<{
-  name: string;
-  address: string;
-  phone: string;
-  description: string;
-  logo: string;
-  email: string;
-}>): Promise<Restaurant> {
+export async function createRestaurant(userId: string, data: any) {
   const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -311,14 +304,7 @@ export async function createRestaurant(userId: string, data: Partial<{
 }
 
 // Register restaurant (if needed)
-export async function registerRestaurant(userId: string, data: Partial<{
-  name: string;
-  address: string;
-  phone: string;
-  description: string;
-  logo: string;
-  email: string;
-}>): Promise<Restaurant> {
+export async function registerRestaurant(userId: string, data: any) {
   const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

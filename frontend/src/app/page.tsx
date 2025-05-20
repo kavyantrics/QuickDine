@@ -1,31 +1,74 @@
+'use client'
+
+
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowRight, QrCode, ShoppingCart, Clock, ChefHat, BarChart } from 'lucide-react'
-import Link from 'next/link'
+import { ArrowRight, QrCode, ShoppingCart, Clock, Star, Shield, Zap } from 'lucide-react'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function HomePage() {
+  const router = useRouter()
+  const { user } = useAuth()
+
+  const handleGetStarted = () => {
+    if (user) {
+      // If user is logged in, redirect to their dashboard based on role
+      if (user.role === 'RESTAURANT_OWNER') {
+        router.push('/restaurant/dashboard')
+      } else if (user.role === 'STAFF') {
+        router.push('/staff/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+    } else {
+      router.push('/restaurant/signup')
+    }
+  }
+
+  const handleSignIn = () => {
+    if (user) {
+      // If already logged in, redirect to appropriate dashboard
+      if (user.role === 'RESTAURANT_OWNER') {
+        router.push('/restaurant/dashboard')
+      } else if (user.role === 'STAFF') {
+        router.push('/staff/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+    } else {
+      router.push('/auth/signin')
+    }
+  }
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
       <div className="bg-primary text-primary-foreground">
-        <div className="container mx-auto py-20 px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
+        <div className="container mx-auto py-24 px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
               Transform Your Restaurant Experience
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-primary-foreground/90">
-              QuickDine brings digital ordering to your tables with QR codes. No more paper menus or waiting for waitstaff.
+            <p className="text-xl md:text-2xl mb-10 text-primary-foreground/90 max-w-3xl mx-auto leading-relaxed">
+              Streamline ordering, boost efficiency, and enhance customer satisfaction with QuickDine&apos;s digital restaurant management solution.
             </p>
-            <div className="flex gap-4 justify-center">
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/restaurant/signup">
-                  Get Started <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
+            <div className="flex gap-6 justify-center">
+              <Button 
+                size="lg" 
+                variant="secondary"
+                className="text-lg px-8 py-6"
+                onClick={handleGetStarted}
+              >
+                Get Started <ArrowRight className="ml-2 h-6 w-6" />
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/auth/signin">
-                  Sign In
-                </Link>
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="text-lg px-8 py-6"
+                onClick={handleSignIn}
+              >
+                Sign In
               </Button>
             </div>
           </div>
@@ -33,55 +76,35 @@ export default function HomePage() {
       </div>
 
       {/* Features Section */}
-      <div className="container mx-auto py-20 px-4">
-        <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <Card>
+      <div className="container mx-auto py-24 px-4">
+        <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+          <Card className="transform hover:scale-105 transition-transform duration-300">
             <CardHeader>
-              <QrCode className="h-12 w-12 text-primary mb-4" />
-              <CardTitle>Scan & Order</CardTitle>
-              <CardDescription>
+              <QrCode className="h-14 w-14 text-primary mb-6" />
+              <CardTitle className="text-2xl mb-4">Scan & Order</CardTitle>
+              <CardDescription className="text-lg">
                 Customers scan a table-specific QR code to access your digital menu instantly.
               </CardDescription>
             </CardHeader>
           </Card>
 
-          <Card>
+          <Card className="transform hover:scale-105 transition-transform duration-300">
             <CardHeader>
-              <ShoppingCart className="h-12 w-12 text-primary mb-4" />
-              <CardTitle>Easy Checkout</CardTitle>
-              <CardDescription>
+              <ShoppingCart className="h-14 w-14 text-primary mb-6" />
+              <CardTitle className="text-2xl mb-4">Easy Checkout</CardTitle>
+              <CardDescription className="text-lg">
                 Customers can browse, add items to cart, and place orders without waiting for waitstaff.
               </CardDescription>
             </CardHeader>
           </Card>
 
-          <Card>
+          <Card className="transform hover:scale-105 transition-transform duration-300">
             <CardHeader>
-              <Clock className="h-12 w-12 text-primary mb-4" />
-              <CardTitle>Real-time Updates</CardTitle>
-              <CardDescription>
+              <Clock className="h-14 w-14 text-primary mb-6" />
+              <CardTitle className="text-2xl mb-4">Real-time Updates</CardTitle>
+              <CardDescription className="text-lg">
                 Track order status in real-time with instant notifications for both customers and staff.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <ChefHat className="h-12 w-12 text-primary mb-4" />
-              <CardTitle>Kitchen Management</CardTitle>
-              <CardDescription>
-                Staff can view and manage orders efficiently through a dedicated admin dashboard.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <BarChart className="h-12 w-12 text-primary mb-4" />
-              <CardTitle>Sales Analytics</CardTitle>
-              <CardDescription>
-                Track your restaurant&apos;s performance with detailed sales reports and analytics.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -89,47 +112,50 @@ export default function HomePage() {
       </div>
 
       {/* Benefits Section */}
-      <div className="bg-muted">
-        <div className="container mx-auto py-20 px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Why Choose QuickDine?</h2>
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold">For Restaurants</h3>
-              <ul className="space-y-2">
-                <li>• Reduce waitstaff workload</li>
-                <li>• Eliminate paper menu costs</li>
-                <li>• Increase order accuracy</li>
-                <li>• Improve customer satisfaction</li>
-                <li>• Real-time order management</li>
-              </ul>
+      <div className="bg-muted py-24">
+        <div className="container mx-auto px-4">
+          <h2 className="text-4xl font-bold text-center mb-16">Why Choose QuickDine?</h2>
+          <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+            <div className="text-center">
+              <Star className="h-16 w-16 text-primary mx-auto mb-6" />
+              <h3 className="text-2xl font-semibold mb-4">Enhanced Experience</h3>
+              <p className="text-lg text-muted-foreground">
+                Provide a modern, contactless ordering experience that delights customers and keeps them coming back.
+              </p>
             </div>
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold">For Customers</h3>
-              <ul className="space-y-2">
-                <li>• No more waiting for menus</li>
-                <li>• Order at your own pace</li>
-                <li>• Track order status in real-time</li>
-                <li>• Easy payment process</li>
-                <li>• Better dining experience</li>
-              </ul>
+
+            <div className="text-center">
+              <Shield className="h-16 w-16 text-primary mx-auto mb-6" />
+              <h3 className="text-2xl font-semibold mb-4">Reliable & Secure</h3>
+              <p className="text-lg text-muted-foreground">
+                Built with enterprise-grade security and reliability to handle your restaurant operations smoothly.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <Zap className="h-16 w-16 text-primary mx-auto mb-6" />
+              <h3 className="text-2xl font-semibold mb-4">Boost Efficiency</h3>
+              <p className="text-lg text-muted-foreground">
+                Reduce wait times, minimize errors, and optimize your staff&apos;s workflow with automated ordering.
+              </p>
             </div>
           </div>
         </div>
       </div>
 
       {/* CTA Section */}
-      <div className="container mx-auto py-20 px-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-6">Ready to Transform Your Restaurant?</h2>
-          <p className="text-xl mb-8 text-muted-foreground">
-            Join the digital revolution and provide a better experience for your customers.
-          </p>
-          <Button asChild size="lg">
-            <Link href="/restaurant/signup">
-              Get Started Now <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
-          </Button>
-        </div>
+      <div className="container mx-auto py-24 px-4 text-center">
+        <h2 className="text-4xl font-bold mb-8">Ready to Transform Your Restaurant?</h2>
+        <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">
+          Join thousands of restaurants already using QuickDine to streamline their operations and delight customers.
+        </p>
+        <Button 
+          size="lg" 
+          className="text-lg px-8 py-6"
+          onClick={handleGetStarted}
+        >
+          Get Started Today <ArrowRight className="ml-2 h-6 w-6" />
+        </Button>
       </div>
     </div>
   )

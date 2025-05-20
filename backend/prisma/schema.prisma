@@ -44,9 +44,6 @@ model User {
   lastFailedLogin  DateTime?
   resetToken       String?
   resetTokenExpiry DateTime?
-  twoFactorEnabled    Boolean   @default(false)
-  twoFactorSecret     String?   
-  twoFactorRecoveryCodes String[] @default([])  // Backup codes for 2FA recovery
 }
 
 model RestaurantOwner {
