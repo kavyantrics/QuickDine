@@ -6,36 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/auth-context'
-import { login } from '@/lib/api'
 import { toast } from 'sonner'
+import { useLogin } from '@/hooks/useLogin'
 
 export default function SignInPage() {
   const { setUser } = useAuth()
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   })
+  const { loginUser, isLoading, error } = useLogin()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
     try {
-      const response = await login(formData.email, formData.password)
-      if (response.success && response.data) {
-        setUser(response.data.user)
-        toast.success('Successfully signed in')
-        router.push('/admin/orders')
-      } else {
-        throw new Error('Invalid response format')
-      }
+      const data = await loginUser(formData.email, formData.password)
+      setUser(data.user)
+      toast.success('Successfully signed in')
+      router.push('/admin/orders')
     } catch (error) {
       console.error('Sign in failed:', error)
       toast.error('Failed to sign in')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -78,6 +70,7 @@ export default function SignInPage() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
+            {error && <div className="text-red-500 mt-2">{error}</div>}
           </form>
         </CardContent>
       </Card>

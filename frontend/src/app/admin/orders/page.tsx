@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getOrders, updateOrderStatus } from '@/lib/api'
+import { useOrders } from '@/hooks/useOrders'
+import { useOrderMutation } from '@/hooks/useOrderMutation'
 import { Order } from '@/types'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -26,107 +27,37 @@ import AdminNavbar from '@/components/AdminNavbar'
 export default function OrdersPage() {
   const router = useRouter()
   const { pusher, isConnected } = usePusher()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const restaurantId = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null
+  const { data: orders, isLoading, error, refetch } = useOrders(restaurantId || "")
+  const { mutate: updateStatus, isLoading: isUpdating } = useOrderMutation()
   const [selectedBill, setSelectedBill] = useState<Order | null>(null)
+  const [optimisticOrders, setOptimisticOrders] = useState<Order[] | null>(null)
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const restaurantId = localStorage.getItem('restaurantId')
-        if (!restaurantId) {
-          toast.error('Restaurant ID not found')
-          router.push('/auth/signin')
-          return
-        }
-        const response = await getOrders(restaurantId)
-        setOrders(response)
-      } catch (error) {
-        console.error('Failed to fetch orders:', error)
-        toast.error('Failed to fetch orders')
-        setOrders([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchOrders()
-  }, [router])
+  // Real-time updates (optional: you can keep this for Pusher integration)
+  // ... (keep your useEffect for Pusher if needed)
 
-  // Subscribe to real-time updates
-  useEffect(() => {
-    if (!pusher || !isConnected) {
-      return
-    }
-
-    const restaurantId = localStorage.getItem('restaurantId')
-    if (!restaurantId) {
-      return
-    }
-
-    const channelName = `restaurant-${restaurantId}`
-    const newChannel = pusher.subscribe(channelName)
-
-    const handleSubscriptionSucceeded = () => {
-    }
-
-    const handleSubscriptionError = (error: Error) => {
-      console.error('Failed to subscribe to channel:', error)
-      toast.error('Failed to connect to real-time updates')
-    }
-
-    const handleNewOrder = (data: { order: Order, message: string }) => {
-      setOrders(prev => [data.order, ...prev])
-      toast.success(data.message)
-    }
-
-    const handleOrderStatusUpdate = (data: { 
-      orderId: string, 
-      status: Order['status'],
-      orderNumber: string,
-      tableNumber: string,
-      message: string 
-    }) => {
-      setOrders(prev => prev.map(order =>
-        order.id === data.orderId ? { ...order, status: data.status } : order
-      ))
-      toast.info(data.message)
-    }
-
-    newChannel.bind('pusher:subscription_succeeded', handleSubscriptionSucceeded)
-    newChannel.bind('pusher:subscription_error', handleSubscriptionError)
-    newChannel.bind('new-order', handleNewOrder)
-    newChannel.bind('order-status-updated', handleOrderStatusUpdate)
-
-    return () => {
-      if (newChannel) {
-        newChannel.unbind('pusher:subscription_succeeded', handleSubscriptionSucceeded)
-        newChannel.unbind('pusher:subscription_error', handleSubscriptionError)
-        newChannel.unbind('new-order', handleNewOrder)
-        newChannel.unbind('order-status-updated', handleOrderStatusUpdate)
-        newChannel.unsubscribe()
-      }
-    }
-  }, [pusher, isConnected])
-
+  // Advanced optimistic UI for status change
   const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
-    try {
-      // Update local state immediately
-      setOrders(prev => prev.map(order => 
+    if (!orders) return
+    // Save previous state for rollback
+    const prevOrders = [...orders]
+    setOptimisticOrders(
+      orders.map(order =>
         order.id === orderId ? { ...order, status: newStatus } : order
-      ))
-      
-      // Make API call
-      await updateOrderStatus(orderId, newStatus)
+      )
+    )
+    try {
+      await updateStatus({ orderId, status: newStatus })
       toast.success('Order status updated')
+      refetch()
     } catch (error) {
-      // Revert the state if API call fails
-      setOrders(prev => prev.map(order => 
-        order.id === orderId ? { ...order, status: order.status } : order
-      ))
-      console.error('Failed to update order status:', error)
+      setOptimisticOrders(prevOrders)
       toast.error('Failed to update order status')
     }
   }
+
+  // Use optimisticOrders if present, else orders from hook
+  const displayOrders = optimisticOrders || orders || []
 
   const handleGenerateBill = (order: Order) => {
     setSelectedBill(order)
@@ -234,19 +165,19 @@ export default function OrdersPage() {
             <tbody>
               ${selectedBill.items.map(item => `
                 <tr>
-                  <td>${item.menuItem.name}</td>
+                  <td>${item.menuItem ? item.menuItem.name : ''}</td>
                   <td>${item.quantity}</td>
-                  <td>$${item.menuItem.price.toFixed(2)}</td>
-                  <td>$${(item.menuItem.price * item.quantity).toFixed(2)}</td>
+                  <td>$${item.menuItem ? item.menuItem.price.toFixed(2) : '0.00'}</td>
+                  <td>$${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
           <div class="divider"></div>
           <div class="total">
-            <p>Subtotal: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.9).toFixed(2)}</p>
-            <p>Tax (10%): $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.1).toFixed(2)}</p>
-            <p>Total: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0).toFixed(2))}</p>
+            <p>Subtotal: $${((selectedBill.total ?? 0) * 0.9).toFixed(2)}</p>
+            <p>Tax (10%): $${((selectedBill.total ?? 0) * 0.1).toFixed(2)}</p>
+            <p>Total: $${((selectedBill.total ?? 0).toFixed(2))}</p>
           </div>
           <div class="footer">
             <p>Thank you for dining with us!</p>
@@ -275,13 +206,13 @@ Date: ${new Date(selectedBill.createdAt).toLocaleString()}
 
 Items:
 ${selectedBill.items.map(item => 
-  `${item.menuItem.name} x${item.quantity} - $${(item.menuItem.price * item.quantity).toFixed(2)}`
+  `${item.menuItem ? item.menuItem.name : ''} x${item.quantity} - $${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}`
 ).join('\n')}
 
 ------------------------
-Subtotal: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.9).toFixed(2)}
-Tax (10%): $${((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.1).toFixed(2)}
-Total: $${((selectedBill.total ?? selectedBill.totalAmount ?? 0).toFixed(2))}
+Subtotal: $${((selectedBill.total ?? 0) * 0.9).toFixed(2)}
+Tax (10%): $${((selectedBill.total ?? 0) * 0.1).toFixed(2)}
+Total: $${((selectedBill.total ?? 0).toFixed(2))}
 
 Thank you for dining with us!
 Please visit again
@@ -308,10 +239,10 @@ Please visit again
     <div className="container mx-auto py-8">
       <h2 className="text-2xl font-bold mb-6">Orders</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {orders.length === 0 ? (
+        {displayOrders.length === 0 ? (
           <p className="text-center text-gray-500 col-span-full">No orders found</p>
         ) : (
-          orders.map(order => (
+          displayOrders.map(order => (
             <div key={order.id} className="bg-white rounded-lg shadow p-6 flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-lg">Table #{order.table?.number ?? '?'}</span>
@@ -325,9 +256,9 @@ Please visit again
                 <ul className="ml-4 mt-1 space-y-1">
                   {order.items.map((item, idx) => (
                     <li key={idx} className="flex justify-between">
-                      <span>{item.menuItem.name}</span>
+                      <span>{item.menuItem ? item.menuItem.name : ''}</span>
                       <span>x{item.quantity}</span>
-                      <span>${(item.menuItem.price * item.quantity).toFixed(2)}</span>
+                      <span>${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}</span>
                     </li>
                   ))}
                 </ul>
@@ -335,7 +266,7 @@ Please visit again
               <div className="flex justify-between items-center mt-2">
                 <span className="font-bold">Total:</span>
                 <span className="font-bold text-green-600">
-                  ${((order.total ?? order.totalAmount ?? 0).toFixed(2))}
+                  ${((order.total ?? 0).toFixed(2))}
                 </span>
               </div>
               <div className="flex flex-col gap-2 mt-4">
@@ -397,19 +328,19 @@ Please visit again
                 <tbody>
                   {selectedBill?.items.map((item, idx) => (
                     <tr key={idx}>
-                      <td>{item.menuItem.name}</td>
+                      <td>{item.menuItem ? item.menuItem.name : ''}</td>
                       <td>{item.quantity}</td>
-                      <td>${item.menuItem.price.toFixed(2)}</td>
-                      <td>${(item.menuItem.price * item.quantity).toFixed(2)}</td>
+                      <td>${item.menuItem ? item.menuItem.price.toFixed(2) : '0.00'}</td>
+                      <td>${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="text-right space-y-1">
-              <p>Subtotal: ${selectedBill && ((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.9).toFixed(2)}</p>
-              <p>Tax (10%): ${selectedBill && ((selectedBill.total ?? selectedBill.totalAmount ?? 0) * 0.1).toFixed(2)}</p>
-              <p className="font-bold">Total: ${selectedBill && ((selectedBill.total ?? selectedBill.totalAmount ?? 0).toFixed(2))}</p>
+              <p>Subtotal: ${selectedBill && ((selectedBill.total ?? 0) * 0.9).toFixed(2)}</p>
+              <p>Tax (10%): ${selectedBill && ((selectedBill.total ?? 0) * 0.1).toFixed(2)}</p>
+              <p className="font-bold">Total: ${selectedBill && ((selectedBill.total ?? 0).toFixed(2))}</p>
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={handleDownloadBill} className="flex items-center gap-2">

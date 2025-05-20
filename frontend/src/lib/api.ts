@@ -11,8 +11,14 @@ interface LoginResponse {
       name: string
       role: string
       restaurantId: string
+      ownedRestaurants?: Array<{
+        id: string
+        name: string
+        role: string
+      }>
     }
-    token: string
+    accessToken: string
+    refreshToken: string
   }
 }
 
@@ -54,6 +60,33 @@ interface ApiResponse<T> {
   success: boolean
   data: T
   error?: string
+}
+
+// Generic API state type
+export interface ApiState<T> {
+  data: T | null
+  error: string | null
+  isLoading: boolean
+}
+
+// Helper to create initial state
+export function createInitialApiState<T>(): ApiState<T> {
+  return { data: null, error: null, isLoading: false }
+}
+
+// Helper to create loading state
+export function createLoadingApiState<T>(): ApiState<T> {
+  return { data: null, error: null, isLoading: true }
+}
+
+// Helper to create error state
+export function createErrorApiState<T>(error: string): ApiState<T> {
+  return { data: null, error, isLoading: false }
+}
+
+// Helper to create success state
+export function createSuccessApiState<T>(data: T): ApiState<T> {
+  return { data, error: null, isLoading: false }
 }
 
 // Helper function to handle API responses
@@ -280,4 +313,16 @@ export async function registerRestaurant(userId: string, data: any) {
   if (!response.ok) throw new Error('Failed to register restaurant')
   const result = await response.json()
   return result.data
+}
+
+// Refresh token
+export async function refreshToken(refreshToken: string): Promise<{ success: boolean; data: { accessToken: string } }> {
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refreshToken }),
+  })
+  return handleResponse<{ success: boolean; data: { accessToken: string } }>(response)
 } 

@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { signupRestaurant } from '@/lib/api'
 import { toast } from 'sonner'
+import { useSignupRestaurant } from '@/hooks/useSignupRestaurant'
 
 export default function RestaurantSignUpPage() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,11 +17,10 @@ export default function RestaurantSignUpPage() {
     address: '',
     phone: '',
   })
+  const { signupRestaurant, isLoading, error } = useSignupRestaurant()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
     try {
       await signupRestaurant(formData)
       toast.success('Restaurant registered successfully!')
@@ -30,8 +28,6 @@ export default function RestaurantSignUpPage() {
     } catch (err) {
       console.error('Restaurant registration failed:', err)
       toast.error('Failed to register restaurant')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -134,6 +130,7 @@ export default function RestaurantSignUpPage() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? 'Registering...' : 'Register Restaurant'}
               </Button>
+              {error && <div className="text-red-500 mt-2">{error}</div>}
             </form>
           </CardContent>
         </Card>

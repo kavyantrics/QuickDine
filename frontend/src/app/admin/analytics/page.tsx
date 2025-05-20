@@ -1,8 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import {
   LineChart,
   Line,
@@ -18,53 +15,16 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { fetchAnalytics } from '@/lib/api'
 import AdminNavbar from '@/components/AdminNavbar'
+import { useAnalytics } from '@/hooks/useAnalytics'
 
-interface AnalyticsData {
-  totalOrdersThisMonth: number
-  revenuePerDay: Array<{
-    date: string
-    revenue: number
-  }>
-  topItems: Array<{
-    id: string
-    name: string
-    price: number
-    category: string
-    totalQuantity: number
-  }>
-}
+
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
 export default function AnalyticsPage() {
-  const router = useRouter()
-  const [data, setData] = useState<AnalyticsData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const loadAnalytics = async () => {
-      try {
-        const restaurantId = localStorage.getItem('restaurantId')
-        if (!restaurantId) {
-          toast.error('Restaurant ID not found')
-          router.push('/auth/signin')
-          return
-        }
-
-        const analyticsData = await fetchAnalytics(restaurantId)
-        setData(analyticsData)
-      } catch (error) {
-        console.error('Error fetching analytics:', error)
-        toast.error('Failed to fetch analytics')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadAnalytics()
-  }, [router])
+  const restaurantId = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null
+  const { data, isLoading, } = useAnalytics(restaurantId || '')
 
   if (isLoading) {
     return (

@@ -1,13 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { getMenu } from '@/lib/api'
-import { MenuItem } from '@/types'
+import { useMenu } from '@/hooks/useMenu'
 import { MenuCard } from '@/components/MenuCard'
 import { CartDrawer } from '@/components/CartDrawer'
-import { toast } from 'sonner'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MenuItem } from '@/types'
 
 interface MenuClientProps {
   restaurantId: string
@@ -35,24 +33,7 @@ const formatCategoryName = (category: string) => {
 }
 
 export default function MenuClient({ restaurantId, tableId }: MenuClientProps) {
-  const [menu, setMenu] = useState<MenuItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        const response = await getMenu(restaurantId, tableId)
-        setMenu(response)
-      } catch (error) {
-        console.error('Failed to fetch menu:', error)
-        toast.error('Failed to load menu')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchMenu()
-  }, [restaurantId, tableId])
+  const { data: menu, isLoading, error } = useMenu(restaurantId, tableId)
 
   if (isLoading) {
     return (
@@ -64,7 +45,11 @@ export default function MenuClient({ restaurantId, tableId }: MenuClientProps) {
     )
   }
 
-  const groupedItems = groupItemsByCategory(menu)
+  if (error) {
+    return <div className="container mx-auto py-8 text-red-500">Failed to load menu.</div>
+  }
+
+  const groupedItems = groupItemsByCategory(menu || [])
 
   return (
     <div className="container mx-auto py-8">

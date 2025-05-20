@@ -1,12 +1,12 @@
- 'use client'
+'use client'
 
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCart } from '@/contexts/cart-context'
-import { createOrder } from '@/lib/api'
 import { toast } from 'sonner'
+import { useCreateOrder } from '@/hooks/useCreateOrder'
 
 interface CheckoutFormProps {
   restaurantId: string
@@ -16,18 +16,16 @@ interface CheckoutFormProps {
 
 export function CheckoutForm({ restaurantId, tableId, onSuccess }: CheckoutFormProps) {
   const { items, total, clearCart } = useCart()
-  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
   })
+  const { mutate: placeOrder, isLoading, error } = useCreateOrder()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
     try {
-      await createOrder({
+      await placeOrder({
         restaurantId,
         tableId,
         customerName: formData.customerName,
@@ -37,15 +35,12 @@ export function CheckoutForm({ restaurantId, tableId, onSuccess }: CheckoutFormP
           quantity: item.quantity,
         })),
       })
-
       toast.success('Order placed successfully!')
       clearCart()
       onSuccess()
     } catch (err) {
       console.error('Order placement failed:', err)
       toast.error('Failed to place order. Please try again.')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -106,6 +101,7 @@ export function CheckoutForm({ restaurantId, tableId, onSuccess }: CheckoutFormP
           >
             {isLoading ? 'Placing Order...' : 'Place Order'}
           </Button>
+          {error && <div className="text-red-500 mt-2">{error}</div>}
         </form>
       </CardContent>
     </Card>

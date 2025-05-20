@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,17 +12,22 @@ import { Label } from '@/components/ui/label'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MenuCategory, categoryLabels } from '@/lib/constants'
-import { getAdminMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/api'
 import { MenuItem } from '@/types'
 import { useAuth } from '@/contexts/auth-context'
 import AdminNavbar from '@/components/AdminNavbar'
+import { useMenu } from '@/hooks/useMenu'
+import { useAddMenuItem } from '@/hooks/useAddMenuItem'
+import { useUpdateMenuItem } from '@/hooks/useUpdateMenuItem'
+import { useDeleteMenuItem } from '@/hooks/useDeleteMenuItem'
 
 export default function MenuPage() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const restaurantId = user?.restaurantId;
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const tableId = '';
+  const { data: menuItems, isLoading, refetch } = useMenu(restaurantId || '', tableId);
+  const { mutate: addMenuItem } = useAddMenuItem();
+  const { mutate: updateMenuItem } = useUpdateMenuItem();
+  const { mutate: deleteMenuItem } = useDeleteMenuItem();
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [formData, setFormData] = useState({
@@ -34,31 +39,8 @@ export default function MenuPage() {
     isAvailable: true
   })
 
-
-  useEffect(() => {
-    if (restaurantId) {
-      fetchMenuItems();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurantId]);
-
-  const fetchMenuItems = async () => {
-    if (!restaurantId) return;
- 
-    try {
-      const items = await getAdminMenu(restaurantId)
-      setMenuItems(items)
-    } catch (error) {
-      console.error('Error fetching menu items:', error)
-      toast.error('Failed to fetch menu items')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
- 
     try {
       if (!restaurantId) return;
       const payload = {
@@ -78,7 +60,7 @@ export default function MenuPage() {
         toast.success('Menu item added')
       }
       setIsDialogOpen(false)
-      fetchMenuItems()
+      refetch()
       resetForm()
     } catch (error) {
       console.error('Error saving menu item:', error)
@@ -102,11 +84,10 @@ export default function MenuPage() {
   const handleDelete = async (id: string) => {
     if (!restaurantId) return;
     if (!confirm('Are you sure you want to delete this item?')) return
-   
     try {
       await deleteMenuItem(restaurantId, id)
       toast.success('Menu item deleted')
-      fetchMenuItems()
+      refetch()
     } catch (error) {
       console.error('Error deleting menu item:', error)
       toast.error('Failed to delete menu item')
@@ -128,7 +109,6 @@ export default function MenuPage() {
   if (!user) {
     return <div>Please log in as a restaurant admin.</div>
   }
-
 
   return (
     <>
@@ -228,7 +208,7 @@ export default function MenuPage() {
         <div>Loading...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {menuItems.map((item) => (
+          {menuItems?.map((item) => (
             <Card key={item.id}>
               <CardHeader>
                 <CardTitle className="flex justify-between items-center">

@@ -6,11 +6,20 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import AdminNavbar from '@/components/AdminNavbar'
-import { updateUser, getRestaurant, updateRestaurant, createRestaurant, registerRestaurant } from '@/lib/api'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { useUserProfile } from '@/hooks/useUserProfile'
+import { useRestaurantProfile } from '@/hooks/useRestaurantProfile'
+import { useCreateRestaurant } from '@/hooks/useCreateRestaurant'
+import { useRegisterRestaurant } from '@/hooks/useRegisterRestaurant'
 
 export default function UserDetailsPage() {
   const { user, setUser } = useAuth()
+  const userId = user?.id || ''
+  const restaurantId = user?.restaurantId || ''
+  const { updateUser } = useUserProfile(userId, user || undefined)
+  const { updateRestaurant, isLoading: restaurantIsLoading } = useRestaurantProfile(userId, restaurantId)
+  const { createRestaurant } = useCreateRestaurant()
+  const { registerRestaurant } = useRegisterRestaurant()
   const [userForm, setUserForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -24,7 +33,6 @@ export default function UserDetailsPage() {
     email: '',
   })
   const [isLoading, setIsLoading] = useState(false)
-  const [restaurantLoading, setRestaurantLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogAction, setDialogAction] = useState<'create' | 'register'>('create')
   const [dialogForm, setDialogForm] = useState({
@@ -75,7 +83,7 @@ export default function UserDetailsPage() {
     e.preventDefault()
     setIsLoading(true)
     try {
-      const updatedUser = await updateUser(user.id, userForm)
+      const updatedUser = await updateUser(userForm)
       setUser({ ...user, ...updatedUser })
       toast.success('User profile updated!')
     } catch {
@@ -89,36 +97,10 @@ export default function UserDetailsPage() {
     e.preventDefault()
     setIsLoading(true)
     try {
-      await updateRestaurant(user.id, user.restaurantId, restaurantForm)
+      await updateRestaurant(restaurantForm)
       toast.success('Restaurant profile updated!')
     } catch {
       toast.error('Failed to update restaurant profile')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleRestaurantCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    try {
-      await createRestaurant(user.id, restaurantForm)
-      toast.success('Restaurant created!')
-    } catch {
-      toast.error('Failed to create restaurant')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleRestaurantRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    try {
-      await registerRestaurant(user.id, restaurantForm)
-      toast.success('Restaurant registered!')
-    } catch {
-      toast.error('Failed to register restaurant')
     } finally {
       setIsLoading(false)
     }
@@ -129,10 +111,10 @@ export default function UserDetailsPage() {
     setIsLoading(true)
     try {
       if (dialogAction === 'create') {
-        await createRestaurant(user.id, dialogForm)
+        await createRestaurant(userId, dialogForm)
         toast.success('Restaurant created!')
       } else {
-        await registerRestaurant(user.id, dialogForm)
+        await registerRestaurant(userId, dialogForm)
         toast.success('Restaurant registered!')
       }
       setDialogOpen(false)
@@ -172,7 +154,7 @@ export default function UserDetailsPage() {
         </form>
 
         <h1 className="text-2xl font-bold mb-4">Restaurant Details</h1>
-        {restaurantLoading ? (
+        {restaurantIsLoading ? (
           <div>Loading restaurant details...</div>
         ) : (
           <form onSubmit={handleRestaurantSubmit} className="space-y-4">

@@ -6,7 +6,7 @@ import { useCart } from "@/contexts/cart-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { submitOrder } from '@/lib/api'
+import { useCreateOrder } from '@/hooks/useCreateOrder'
 
 interface CheckoutClientProps {
   restaurantId: string
@@ -18,7 +18,7 @@ export default function CheckoutClient({ restaurantId, tableId }: CheckoutClient
   const [step, setStep] = useState<"form" | "review" | "success">("form");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { mutate: placeOrder, isLoading: isPlacingOrder, error: orderError } = useCreateOrder();
   const router = useRouter();
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -31,9 +31,8 @@ export default function CheckoutClient({ restaurantId, tableId }: CheckoutClient
   };
 
   const handlePlaceOrder = async () => {
-    setLoading(true);
     try {
-      await submitOrder({
+      await placeOrder({
         restaurantId,
         tableId,
         customerName: name,
@@ -47,8 +46,6 @@ export default function CheckoutClient({ restaurantId, tableId }: CheckoutClient
       setStep("success");
     } catch {
       toast.error("Failed to place order. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -93,9 +90,10 @@ export default function CheckoutClient({ restaurantId, tableId }: CheckoutClient
           <span className="font-bold">Total</span>
           <span className="font-bold">${total.toFixed(2)}</span>
         </div>
-        <Button className="w-full" onClick={handlePlaceOrder} disabled={items.length === 0 || loading}>
-          {loading ? "Placing Order..." : "Place Order"}
+        <Button className="w-full" onClick={handlePlaceOrder} disabled={items.length === 0 || isPlacingOrder}>
+          {isPlacingOrder ? "Placing Order..." : "Place Order"}
         </Button>
+        {orderError && <div className="text-red-500 mt-2">{orderError}</div>}
       </div>
     );
   }
