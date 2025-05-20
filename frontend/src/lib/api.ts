@@ -226,4 +226,21 @@ export async function getAdminMenu(restaurantId: string): Promise<MenuItem[]> {
   );
   const result = await handleResponse<{ success: boolean; data: MenuItem[] }>(response);
   return result.data;
+}
+
+export async function updateUser(
+  userId: string,
+  data: { name?: string; email?: string }
+) {
+  const response = await fetch(
+    `${API_URL}/api/auth/users/${userId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }
+  )
+  if (!response.ok) throw new Error('Failed to update user')
+  const result = await response.json()
+  return result.data
 } 

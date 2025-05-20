@@ -39,6 +39,8 @@ export interface Restaurant {
   email: string
   address?: string
   phone?: string
+  description?: string
+  logo?: string
   createdAt: Date
   updatedAt: Date
 } 

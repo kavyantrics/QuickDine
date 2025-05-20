@@ -125,5 +125,22 @@ export const authController = {
     } catch (error) {
       next(error)
     }
-  }) as RequestHandler
+  }) as RequestHandler,
+
+  // PATCH /api/users/:id
+  updateUser: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params
+      const { name, email } = req.body
+      // Add validation as needed
+      const user = await prisma.user.update({
+        where: { id },
+        data: { name, email }
+      })
+      res.json({ success: true, data: user })
+    } catch (error) {
+      console.error('Error updating user:', error)
+      res.status(500).json({ error: 'Failed to update user' })
+    }
+  }
 }
