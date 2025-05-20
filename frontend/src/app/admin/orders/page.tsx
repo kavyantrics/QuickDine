@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Printer, Download } from 'lucide-react'
+import AdminNavbar from '@/components/AdminNavbar'
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -302,6 +303,8 @@ Please visit again
   }
 
   return (
+    <>
+    <AdminNavbar />
     <div className="container mx-auto py-8">
       <h2 className="text-2xl font-bold mb-6">Orders</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -421,6 +424,7 @@ Please visit again
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div>  
+    </>
   )
 }

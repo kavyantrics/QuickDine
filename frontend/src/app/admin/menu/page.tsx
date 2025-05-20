@@ -15,6 +15,7 @@ import { MenuCategory, categoryLabels } from '@/lib/constants'
 import { getAdminMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/api'
 import { MenuItem } from '@/types'
 import { useAuth } from '@/contexts/auth-context'
+import AdminNavbar from '@/components/AdminNavbar'
 
 export default function MenuPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -130,6 +131,8 @@ export default function MenuPage() {
 
 
   return (
+    <>
+    <AdminNavbar />
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Menu Management</h1>
@@ -265,5 +268,6 @@ export default function MenuPage() {
         </div>
       )}
     </div>
+    </>
   )
 } 

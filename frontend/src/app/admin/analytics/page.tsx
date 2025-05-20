@@ -19,6 +19,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fetchAnalytics } from '@/lib/api'
+import AdminNavbar from '@/components/AdminNavbar'
 
 interface AnalyticsData {
   totalOrdersThisMonth: number
@@ -89,6 +90,8 @@ export default function AnalyticsPage() {
   const totalRevenue = data.revenuePerDay.reduce((sum, day) => sum + day.revenue, 0)
 
   return (
+    <>
+    <AdminNavbar />
     <div className="container mx-auto py-8">
       <h2 className="text-2xl font-bold mb-6">Analytics Dashboard</h2>
 
@@ -194,5 +197,6 @@ export default function AnalyticsPage() {
         </Card>
       </div>
     </div>
+    </>
   )
 } 
