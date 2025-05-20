@@ -1,28 +1,14 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express'
 import { prisma } from '../utils/db'
 import { z } from 'zod'
-import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { UserRole } from '@prisma/client'
 import { hashPassword, verifyPassword, isStrongPassword } from '../middleware/auth'
 import { AppError } from '../utils/errors'
-
-// Validation schemas
-const SignupSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  name: z.string(),
-  role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
-  restaurantId: z.string().optional() // Required for staff, optional for admin
-})
-
-const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string()
-})
-
-const REFRESH_TOKEN_EXPIRY = '7d'
-const ACCESS_TOKEN_EXPIRY = '15m'
+import { validatePasswordComplexity, checkLoginAttempts, incrementLoginAttempts, resetLoginAttempts } from '../utils/password'
+import { SignupSchema, LoginSchema } from '../schemas/validation'
+import { REFRESH_TOKEN_EXPIRY, ACCESS_TOKEN_EXPIRY, PASSWORD_RESET_EXPIRY } from '../lib/constants'
+import { TOTPService } from '../utils/totp'
 
 function generateAccessToken(user: any) {
   return jwt.sign(
@@ -47,6 +33,7 @@ function generateRefreshToken(user: any) {
   )
 }
 
+// Add these new endpoints to authController
 export const authController = {
   // User signup
   signup: (async (req: Request, res: Response, next: NextFunction) => {
@@ -132,17 +119,25 @@ export const authController = {
         return next(new AppError('Invalid credentials', 401))
       }
 
-      // Verify password
-      const isValidPassword = await verifyPassword(password, user.password)
+      // Check if account is locked
+      const canLogin = await checkLoginAttempts(user.id)
+      if (!canLogin) {
+        return next(new AppError('Account is locked. Please try again later.', 423))
+      }
 
+      const isValidPassword = await verifyPassword(password, user.password)
       if (!isValidPassword) {
+        await incrementLoginAttempts(user.id)
         return next(new AppError('Invalid credentials', 401))
       }
 
-      // Generate tokens
+      // Reset login attempts on successful login
+      await resetLoginAttempts(user.id)
+
       const accessToken = generateAccessToken(user)
       const refreshToken = generateRefreshToken(user)
-      // Store refresh token in DB (session)
+
+      // Store refresh token
       await prisma.session.create({
         data: {
           userId: user.id,
@@ -228,6 +223,251 @@ export const authController = {
     } catch (error) {
       console.error('Error updating user:', error)
       next(new AppError('Failed to update user', 500))
+    }
+  },
+
+  updatePassword: async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, password } = z.object({
+      email: z.string().email(),
+      password: z.string()
+    }).parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user || !user.resetToken || !user.resetTokenExpiry) {
+      return next(new AppError('Reset token not found. Please request again.', 400));
+    }
+
+    const passwordValidation = validatePasswordComplexity(password);
+    if (!passwordValidation.isValid) {
+      return next(new AppError(passwordValidation.message, 400));
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Password has been updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+},
+
+  verifyResetPasswordToken: async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, token } = z.object({
+      email: z.string().email(),
+      token: z.string()
+    }).parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user || !user.resetToken || !user.resetTokenExpiry) {
+      return next(new AppError('Invalid or expired reset token', 400));
+    }
+
+    if (new Date() > user.resetTokenExpiry) {
+      return next(new AppError('Reset token has expired', 400));
+    }
+
+    const isValidToken = await verifyPassword(token, user.resetToken);
+    if (!isValidToken) {
+      return next(new AppError('Invalid reset token', 400));
+    }
+
+    res.json({
+      success: true,
+      message: 'Reset token is valid'
+    });
+  } catch (error) {
+    next(error);
+  }
+},
+
+  setup2FA: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user?.userId
+      if (!userId) {
+        return next(new AppError('Authentication required', 401))
+      }
+
+      const secret = TOTPService.generateSecret()
+      const user = await prisma.user.findUnique({ where: { id: userId } })
+      
+      if (!user) {
+        return next(new AppError('User not found', 404))
+      }
+
+      const qrCode = await TOTPService.generateQRCode(user.email, secret)
+      const recoveryCodes = TOTPService.generateRecoveryCodes()
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          twoFactorSecret: secret,
+          twoFactorRecoveryCodes: recoveryCodes
+        }
+      })
+
+      res.json({
+        success: true,
+        data: {
+          qrCode,
+          recoveryCodes,
+          secret // Only shown during initial setup
+        }
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  verify2FA: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = z.object({
+        token: z.string().length(6)
+      }).parse(req.body)
+
+      const userId = req.user?.userId
+      if (!userId) {
+        return next(new AppError('Authentication required', 401))
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { twoFactorSecret: true }
+      })
+
+      if (!user?.twoFactorSecret) {
+        return next(new AppError('2FA not set up', 400))
+      }
+
+      const isValid = TOTPService.verifyToken(token, user.twoFactorSecret)
+      if (!isValid) {
+        return next(new AppError('Invalid 2FA token', 401))
+      }
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorEnabled: true }
+      })
+
+      res.json({
+        success: true,
+        message: '2FA enabled successfully'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  disable2FA: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = z.object({
+        token: z.string().length(6)
+      }).parse(req.body)
+
+      const userId = req.user?.userId
+      if (!userId) {
+        return next(new AppError('Authentication required', 401))
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { twoFactorSecret: true }
+      })
+
+      if (!user?.twoFactorSecret) {
+        return next(new AppError('2FA not enabled', 400))
+      }
+
+      const isValid = TOTPService.verifyToken(token, user.twoFactorSecret)
+      if (!isValid) {
+        return next(new AppError('Invalid 2FA token', 401))
+      }
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          twoFactorRecoveryCodes: []
+        }
+      })
+
+      res.json({
+        success: true,
+        message: '2FA disabled successfully'
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  verify2FALogin: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, token } = z.object({
+        email: z.string().email(),
+        token: z.string().length(6)
+      }).parse(req.body)
+
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          twoFactorSecret: true,
+          twoFactorRecoveryCodes: true
+        }
+      })
+
+      if (!user?.twoFactorSecret) {
+        return next(new AppError('2FA not enabled', 400))
+      }
+
+      const isValidToken = TOTPService.verifyToken(token, user.twoFactorSecret)
+      const isRecoveryCode = user.twoFactorRecoveryCodes.includes(token)
+
+      if (!isValidToken && !isRecoveryCode) {
+        return next(new AppError('Invalid 2FA token', 401))
+      }
+
+      if (isRecoveryCode) {
+        // Remove used recovery code
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            twoFactorRecoveryCodes: {
+              set: user.twoFactorRecoveryCodes.filter(code => code !== token)
+            }
+          }
+        })
+      }
+
+      // Generate new session tokens
+      const accessToken = generateAccessToken(user)
+      const refreshToken = generateRefreshToken(user)
+
+      res.json({
+        success: true,
+        data: { accessToken, refreshToken }
+      })
+    } catch (error) {
+      next(error)
     }
   }
 }

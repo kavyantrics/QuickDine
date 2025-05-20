@@ -101,3 +101,17 @@ export const RestaurantOwnerSchema = z.object({
 
 export const CreateRestaurantOwnerSchema = RestaurantOwnerSchema
 export const UpdateRestaurantOwnerSchema = RestaurantOwnerSchema.partial() 
+
+// Validation schemas
+export const SignupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string(),
+  role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
+  restaurantId: z.string().optional() // Required for staff, optional for admin
+})
+
+export const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string()
+})

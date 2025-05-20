@@ -57,3 +57,7 @@ export interface Order {
     capacity: number;
   };
 } 
+export interface PasswordResetToken {
+  token: string
+  expires: Date
+}

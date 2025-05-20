@@ -101,7 +101,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // Get menu items for a restaurant and table
 export async function getMenu(restaurantId: string, tableId: string): Promise<MenuItem[]> {
   const response = await fetch(
-    `${API_URL}/api/restaurants/menu?restaurantId=${restaurantId}&tableId=${tableId}`
+    `${API_URL}/api/v1/restaurants/menu?restaurantId=${restaurantId}&tableId=${tableId}`
   )
   const result = await handleResponse<ApiResponse<MenuItem[]>>(response)
   return result.data
@@ -109,7 +109,7 @@ export async function getMenu(restaurantId: string, tableId: string): Promise<Me
 
 // Submit a new order
 export async function submitOrder(data: OrderData): Promise<Order> {
-  const response = await fetch(`${API_URL}/api/orders`, {
+  const response = await fetch(`${API_URL}/api/v1/orders`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -121,7 +121,7 @@ export async function submitOrder(data: OrderData): Promise<Order> {
 
 // Login restaurant
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
 // Signup new restaurant
 export async function signupRestaurant(data: SignupRestaurantData): Promise<Restaurant> {
-  const response = await fetch(`${API_URL}/api/restaurants`, {
+  const response = await fetch(`${API_URL}/api/v1/restaurants`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -145,7 +145,7 @@ export async function signupRestaurant(data: SignupRestaurantData): Promise<Rest
 
 // Get orders for a restaurant
 export async function getOrders(restaurantId: string): Promise<Order[]> {
-  const response = await fetch(`${API_URL}/api/orders/restaurant/${restaurantId}`, {
+  const response = await fetch(`${API_URL}/api/v1/orders/restaurant/${restaurantId}`, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
@@ -160,7 +160,7 @@ export async function updateOrderStatus(
   orderId: string,
   status: Order['status']
 ): Promise<Order> {
-  const response = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
+  const response = await fetch(`${API_URL}/api/v1/orders/${orderId}/status`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -172,7 +172,7 @@ export async function updateOrderStatus(
 
 // Get restaurant details
 export async function getRestaurant(userId: string, restaurantId: string): Promise<Restaurant> {
-  const response = await fetch(`${API_URL}/api/restaurants/user/${userId}/restaurant/${restaurantId}`);
+  const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant/${restaurantId}`);
   if (!response.ok) throw new Error('Failed to fetch restaurant');
   const result = await response.json();
   return result.data;
@@ -192,7 +192,7 @@ export async function updateRestaurant(
   }>
 ) {
   const response = await fetch(
-    `${API_URL}/api/restaurants/user/${userId}/restaurant/${restaurantId}`,
+    `${API_URL}/api/v1/restaurants/user/${userId}/restaurant/${restaurantId}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -209,7 +209,7 @@ export async function addMenuItem(
   restaurantId: string,
   data: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<MenuItem> {
-  const response = await fetch(`${API_URL}/api/restaurants/${restaurantId}/menu`, {
+  const response = await fetch(`${API_URL}/api/v1/restaurants/${restaurantId}/menu`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -227,7 +227,7 @@ export async function updateMenuItem(
   data: Partial<Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<MenuItem> {
   const response = await fetch(
-    `${API_URL}/api/restaurants/${restaurantId}/menu/${menuItemId}`,
+    `${API_URL}/api/v1/restaurants/${restaurantId}/menu/${menuItemId}`,
     {
       method: 'PATCH',
       headers: {
@@ -246,7 +246,7 @@ export async function deleteMenuItem(
   menuItemId: string
 ): Promise<void> {
   const response = await fetch(
-    `${API_URL}/api/restaurants/${restaurantId}/menu/${menuItemId}`,
+    `${API_URL}/api/v1/restaurants/${restaurantId}/menu/${menuItemId}`,
     {
       method: 'DELETE',
     }
@@ -257,7 +257,7 @@ export async function deleteMenuItem(
 }
 
 export async function fetchAnalytics(restaurantId: string): Promise<AnalyticsData> {
-  const response = await fetch(`${API_URL}/api/analytics/${restaurantId}`)
+  const response = await fetch(`${API_URL}/api/v1/analytics/${restaurantId}`)
 
   if (!response.ok) {
     throw new Error('Failed to fetch analytics')
@@ -268,7 +268,7 @@ export async function fetchAnalytics(restaurantId: string): Promise<AnalyticsDat
 
 export async function getAdminMenu(restaurantId: string): Promise<MenuItem[]> {
   const response = await fetch(
-    `${API_URL}/api/restaurants/admin-menu/${restaurantId}`
+    `${API_URL}/api/v1/restaurants/admin-menu/${restaurantId}`
   );
   const result = await handleResponse<{ success: boolean; data: MenuItem[] }>(response);
   return result.data;
@@ -279,7 +279,7 @@ export async function updateUser(
   data: { name?: string; email?: string }
 ) {
   const response = await fetch(
-    `${API_URL}/api/auth/users/${userId}`,
+    `${API_URL}/api/v1/auth/users/${userId}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -292,8 +292,15 @@ export async function updateUser(
 }
 
 // Create restaurant
-export async function createRestaurant(userId: string, data: any) {
-  const response = await fetch(`${API_URL}/api/restaurants/user/${userId}/restaurant`, {
+export async function createRestaurant(userId: string, data: Partial<{
+  name: string;
+  address: string;
+  phone: string;
+  description: string;
+  logo: string;
+  email: string;
+}>): Promise<Restaurant> {
+  const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -304,8 +311,15 @@ export async function createRestaurant(userId: string, data: any) {
 }
 
 // Register restaurant (if needed)
-export async function registerRestaurant(userId: string, data: any) {
-  const response = await fetch(`${API_URL}/api/restaurants/user/${userId}/restaurant/register`, {
+export async function registerRestaurant(userId: string, data: Partial<{
+  name: string;
+  address: string;
+  phone: string;
+  description: string;
+  logo: string;
+  email: string;
+}>): Promise<Restaurant> {
+  const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -317,7 +331,7 @@ export async function registerRestaurant(userId: string, data: any) {
 
 // Refresh token
 export async function refreshToken(refreshToken: string): Promise<{ success: boolean; data: { accessToken: string } }> {
-  const response = await fetch(`${API_URL}/api/auth/refresh`, {
+  const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

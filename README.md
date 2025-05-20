@@ -10,6 +10,9 @@ A modern restaurant ordering system that allows customers to place orders via QR
 - Admin dashboard for order management
 - Menu management system
 - Real-time notifications using Pusher
+- Role-based access control (SUPER_ADMIN, RESTAURANT_OWNER, RESTAURANT_ADMIN, STAFF)
+- Analytics dashboard with sales and order metrics
+- Multi-restaurant support
 
 ## 🧰 Tech Stack
 ### Frontend
@@ -18,6 +21,8 @@ A modern restaurant ordering system that allows customers to place orders via QR
 - tRPC
 - React Hook Form + Zod
 - ShadCN UI
+- Context API for state management
+- JWT-based authentication
 
 ### Backend
 - Express.js
@@ -25,6 +30,9 @@ A modern restaurant ordering system that allows customers to place orders via QR
 - Prisma
 - PostgreSQL
 - Pusher for real-time updates
+- JWT for authentication
+- bcrypt for password hashing
+- Zod for input validation
 
 ---
 
@@ -44,12 +52,15 @@ PUSHER_APP_ID="your-pusher-app-id"
 PUSHER_KEY="your-pusher-key"
 PUSHER_SECRET="your-pusher-secret"
 PUSHER_CLUSTER="your-pusher-cluster"
-```
+JWT_SECRET="your-jwt-secret-key"
+JWT_REFRESH_SECRET="your-jwt-refresh-secret-key"
+
 
 #### Frontend (.env.local)
 ```env
 NEXT_PUBLIC_PUSHER_KEY="your-pusher-key"
 NEXT_PUBLIC_PUSHER_CLUSTER="your-pusher-cluster"
+NEXT_PUBLIC_API_URL="http://localhost:8000"
 ```
 
 ---
@@ -113,22 +124,122 @@ quickdine/
 ```
 
 ---
+### Environment Variables
+#### Backend (.env)
+```env
+DATABASE_URL="postgresql://
+postgres:postgres@localhost:5432/quickdine?
+schema=public"
+NEXTAUTH_SECRET="your-secret-key-here"
+PUSHER_APP_ID="your-pusher-app-id"
+PUSHER_KEY="your-pusher-key"
+PUSHER_SECRET="your-pusher-secret"
+PUSHER_CLUSTER="your-pusher-cluster"
+JWT_SECRET="your-jwt-secret-key"
+JWT_REFRESH_SECRET="your-jwt-refresh-secret-key
+"
+``` Frontend (.env.local)
+```
+NEXT_PUBLIC_PUSHER_KEY="your-pusher-key"
+NEXT_PUBLIC_PUSHER_CLUSTER="your-pusher-cluster
+"
+NEXT_PUBLIC_API_URL="http://localhost:8000"
+```
 
-## 📡 API Documentation
+
+### 📡 API Endpoints
 ### Authentication
-- All admin routes require JWT authentication
-- Rate limit: 100 requests per 15 minutes
-
-### Endpoints
-#### Public Endpoints
-- **getMenuItems** (GET) → Fetch available menu items
-- **createOrder** (POST) → Submit new order
-
-#### Protected Endpoints (Admin Only)
-- **getOrders** (GET) → Fetch all orders
-- **updateOrderStatus** (PATCH) → Update order status
+- POST /api/auth/signup - User registration
+- POST /api/auth/login - User login
+- POST /api/auth/refresh - Refresh access token
+- PATCH /api/auth/users/:id - Update user profile
+### Restaurant Management
+- GET /api/restaurants/menu - Get restaurant menu (customer view)
+- GET /api/restaurants/admin-menu/:restaurantId - Get restaurant menu (admin view)
+- POST /api/restaurants/:restaurantId/menu - Create menu item
+- PATCH /api/restaurants/:restaurantId/menu/:id - Update menu item
+- DELETE /api/restaurants/:restaurantId/menu/:id - Delete menu item
+- POST /api/restaurants/user/:userId/restaurant - Create restaurant
+- GET /api/restaurants/user/:userId/restaurant/:restaurantId - Get restaurant details
+- PATCH /api/restaurants/user/:userId/restaurant/:restaurantId - Update restaurant
+### Order Management
+- POST /api/orders - Create new order
+- GET /api/orders/restaurant/:restaurantId - Get restaurant orders
+- GET /api/orders/:id - Get specific order
+- PATCH /api/orders/:id/status - Update order status
+### Analytics
+- GET /api/analytics/:restaurantId - Get restaurant analytics
 
 ---
+
+
+🏗 Frontend Structure
+Core Components
+AdminNavbar - Navigation for admin dashboard
+CartDrawer - Shopping cart sidebar
+CheckoutForm - Order payment form
+MenuCard - Menu item display
+OrderRow - Order list item
+StatusBadge - Order status indicator
+Context Providers
+AuthProvider - Authentication state and methods
+CartProvider - Shopping cart state management
+PusherProvider - Real-time updates configuration
+Custom Hooks
+useAuth - Authentication utilities
+useCart - Cart management
+useMenu - Menu operations
+useOrders - Order management
+useAnalytics - Analytics data fetching
+usePusher - Real-time updates
+
+
+
+🗃 Database Schema
+Core Models
+Restaurant - Restaurant details and relationships
+User - User authentication and profile
+MenuItem - Menu items with categories
+Order - Order tracking and details
+Table - Table management with QR codes
+Session - Authentication session management
+
+
+
+Enums
+UserRole - User access levels
+OrderStatus - Order progress tracking
+PaymentStatus - Payment state tracking
+TableStatus - Table availability status
+MenuCategory - Menu item categorization
+
+
+
+
+## ⚙️ Setup Instructions
+[Previous setup instructions remain the same...]
+
+## 🔒 Authentication Flow
+1. User registers/logs in via /api/auth/login or /api/auth/signup
+2. Server validates credentials and returns access & refresh tokens
+3. Frontend stores tokens in localStorage
+4. Access token used for API requests (15-minute expiry)
+5. Refresh token used to obtain new access tokens (7-day expiry)
+6. AuthContext manages token refresh and user state
+
+## 🔄 Real-time Updates
+- Pusher channels used for order notifications
+- Restaurant-specific channels ( restaurant-${restaurantId} )
+- Events: new-order , order-status-updated
+- PusherContext manages subscriptions and event handling
+
+## 🛡️ Security Features
+- JWT-based authentication
+- Password hashing with bcrypt
+- Rate limiting on authentication endpoints
+- Role-based access control
+- Input validation with Zod
+- SQL injection prevention with Prisma
 
 ## 🔒 Security Measures
 - Input validation using Zod
@@ -139,72 +250,6 @@ quickdine/
 - Secure session management
 
 ---
-
-## 🧪 Testing Strategy
-### Frontend Testing
-- Unit tests: Jest + React Testing Library
-- E2E tests: Cypress
-- Component testing: Storybook
-
-### Backend Testing
-- Unit tests: Jest
-- Integration tests: Supertest
-- API tests: Postman collection
-
-### Test Coverage Goals
-- Frontend: 80% coverage
-- Backend: 90% coverage
-
----
-
-## 📈 Monitoring & Logging
-### Error Tracking
-- Sentry integration for error monitoring
-- Custom error boundaries in React
-
-### Performance Monitoring
-- Next.js Analytics
-- Custom performance metrics tracking
-- API response time monitoring
-
-### Logging
-- Winston for backend logging
-- Log rotation setup
-- Structured logging format
-
----
-
-## 🧰 Backup & Recovery
-### Database Backup
-- Daily automated backups
-- Point-in-time recovery capability
-- 30-day backup retention
-
-### Recovery Procedures
-- Database restore from backup
-- Environment configuration backup
-- Application state recovery
-
----
-
-## 🧭 Future Roadmap
-### Phase 1 (Next 3 months)
-- Analytics dashboard
-- Customer feedback system
-- Kitchen display system
-- Mobile app version
-
-### Phase 2 (6 months)
-- Multi-restaurant support
-- POS system integration
-- Inventory management
-- Staff management
-
-### Phase 3 (12 months)
-- AI-powered demand prediction
-- Loyalty program
-- Advanced analytics
-- Multi-language support
 
 ---
 
