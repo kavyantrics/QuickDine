@@ -55,7 +55,7 @@ const MenuItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
   price: z.number().positive('Price must be positive'),
-  category: z.enum(['STARTERS', 'MAIN_COURSE', 'DRINKS', 'DESSERTS', 'SIDES', 'SNACKS', 'BREAKFAST', 'LUNCH', 'DINNER']),
+  category: z.enum(['STARTER', 'MAIN_COURSE', 'DRINKS', 'DESSERT', 'SIDES', 'SNACKS', 'BREAKFAST', 'LUNCH', 'DINNER']),
   image: z.string().optional(),
   isAvailable: z.boolean().default(true),
   restaurantId: z.string()
@@ -275,42 +275,71 @@ export const restaurantController = {
 
   createMenuItem: async (req: Request, res: Response) => {
     try {
-      const data = MenuItemSchema.parse(req.body)
+      const { restaurantId } = req.params;
+      const data = MenuItemSchema.parse({
+        ...req.body,
+        restaurantId, // override with param
+      });
       const menuItem = await prisma.menuItem.create({
         data
-      })
-      res.status(201).json({ success: true, data: menuItem })
+      });
+      res.status(201).json({ success: true, data: menuItem });
     } catch (error) {
-      console.error('Error creating menu item:', error)
-      res.status(500).json({ error: 'Failed to create menu item' })
+      console.error('Error creating menu item:', error);
+      res.status(500).json({ error: 'Failed to create menu item' });
     }
   },
 
   updateMenuItem: async (req: Request, res: Response) => {
     try {
-      const { id } = req.params
-      const data = UpdateMenuItemSchema.parse(req.body)
+      const { restaurantId, id } = req.params;
+      const data = UpdateMenuItemSchema.parse(req.body);
+
+      // Optionally, ensure the menu item belongs to the restaurant
       const menuItem = await prisma.menuItem.update({
         where: { id },
-        data
-      })
-      res.json({ success: true, data: menuItem })
+        data: {
+          ...data,
+          restaurantId, // ensure restaurantId is not changed
+        }
+      });
+      res.json({ success: true, data: menuItem });
     } catch (error) {
-      console.error('Error updating menu item:', error)
-      res.status(500).json({ error: 'Failed to update menu item' })
+      console.error('Error updating menu item:', error);
+      res.status(500).json({ error: 'Failed to update menu item' });
     }
   },
 
   deleteMenuItem: async (req: Request, res: Response) => {
     try {
-      const { id } = req.params
+      const { restaurantId, id } = req.params;
+
+      // Optionally, ensure the menu item belongs to the restaurant before deleting
       await prisma.menuItem.delete({
         where: { id }
-      })
-      res.json({ success: true, message: 'Menu item deleted successfully' })
+      });
+      res.json({ success: true, message: 'Menu item deleted successfully' });
     } catch (error) {
-      console.error('Error deleting menu item:', error)
-      res.status(500).json({ error: 'Failed to delete menu item' })
+      console.error('Error deleting menu item:', error);
+      res.status(500).json({ error: 'Failed to delete menu item' });
+    }
+  },
+
+  // Get all menu items for a restaurant (admin)
+  getAdminMenu: async (req: Request, res: Response) => {
+    try {
+      const { restaurantId } = req.params;
+      if (!restaurantId) {
+        return res.status(400).json({ success: false, error: 'restaurantId is required' });
+      }
+      const menuItems = await prisma.menuItem.findMany({
+        where: { restaurantId },
+        orderBy: { createdAt: 'desc' }
+      });
+      res.json({ success: true, data: menuItems });
+    } catch (error) {
+      console.error('Error fetching admin menu:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch menu items' });
     }
   }
 }

@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useAuth } from '@/contexts/auth-context'
 import { login } from '@/lib/api'
 import { toast } from 'sonner'
 
 export default function SignInPage() {
+  const { setUser } = useAuth()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -23,9 +25,7 @@ export default function SignInPage() {
     try {
       const response = await login(formData.email, formData.password)
       if (response.success && response.data) {
-        localStorage.setItem('token', response.data.token)
-        localStorage.setItem('userId', response.data.user.id)
-        localStorage.setItem('restaurantId', response.data.user.restaurantId)
+        setUser(response.data.user)
         toast.success('Successfully signed in')
         router.push('/admin/orders')
       } else {

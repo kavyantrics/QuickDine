@@ -218,4 +218,12 @@ export async function fetchAnalytics(restaurantId: string): Promise<AnalyticsDat
   }
 
   return response.json()
+}
+
+export async function getAdminMenu(restaurantId: string): Promise<MenuItem[]> {
+  const response = await fetch(
+    `${API_URL}/api/restaurants/admin-menu/${restaurantId}`
+  );
+  const result = await handleResponse<{ success: boolean; data: MenuItem[] }>(response);
+  return result.data;
 } 

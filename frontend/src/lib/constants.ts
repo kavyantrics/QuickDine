@@ -1,9 +1,9 @@
 // Menu category enum matching the backend
 export enum MenuCategory {
-  STARTERS = 'STARTERS',
+  STARTER = 'STARTER',
   MAIN_COURSE = 'MAIN_COURSE',
   DRINKS = 'DRINKS',
-  DESSERTS = 'DESSERTS',
+  DESSERT = 'DESSERT',
   SIDES = 'SIDES',
   SNACKS = 'SNACKS',
   BREAKFAST = 'BREAKFAST',
@@ -13,10 +13,10 @@ export enum MenuCategory {
 
 // User-friendly category labels
 export const categoryLabels: Record<MenuCategory, string> = {
-  [MenuCategory.STARTERS]: 'Starters',
+  [MenuCategory.STARTER]: 'Starter',
   [MenuCategory.MAIN_COURSE]: 'Main Course',
   [MenuCategory.DRINKS]: 'Drinks',
-  [MenuCategory.DESSERTS]: 'Desserts',
+  [MenuCategory.DESSERT]: 'Dessert',
   [MenuCategory.SIDES]: 'Sides',
   [MenuCategory.SNACKS]: 'Snacks',
   [MenuCategory.BREAKFAST]: 'Breakfast',

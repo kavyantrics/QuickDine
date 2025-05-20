@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "@/contexts/cart-context";
 import { PusherProvider } from "@/contexts/pusher-context";
 import { Toaster } from "sonner";
+import { AuthProvider } from '@/contexts/auth-context'
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,12 +21,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className} suppressHydrationWarning>
-        <PusherProvider>
-          <CartProvider>
-        {children}
-            <Toaster />
-          </CartProvider>
-        </PusherProvider>
+        <AuthProvider>
+          <PusherProvider>
+            <CartProvider>
+              {children}
+              <Toaster />
+            </CartProvider>
+          </PusherProvider>
+        </AuthProvider>
       </body>
     </html>
   );

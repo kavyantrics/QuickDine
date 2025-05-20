@@ -12,15 +12,14 @@ import { Label } from '@/components/ui/label'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MenuCategory, categoryLabels } from '@/lib/constants'
-import { getMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/api'
+import { getAdminMenu, addMenuItem, updateMenuItem, deleteMenuItem } from '@/lib/api'
 import { MenuItem } from '@/types'
+import { useAuth } from '@/contexts/auth-context'
 
-interface MenuProps {
-  restaurantId: string
-  tableId: string
-}
-
-export default function MenuPage({ restaurantId, tableId }: MenuProps) {
+export default function MenuPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { user, setUser } = useAuth();
+  const restaurantId = user?.restaurantId;
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -34,15 +33,19 @@ export default function MenuPage({ restaurantId, tableId }: MenuProps) {
     isAvailable: true
   })
 
+
   useEffect(() => {
-    fetchMenuItems();
+    if (restaurantId) {
+      fetchMenuItems();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restaurantId, tableId]);
+  }, [restaurantId]);
 
   const fetchMenuItems = async () => {
+    if (!restaurantId) return;
  
     try {
-      const items = await getMenu(restaurantId, tableId)
+      const items = await getAdminMenu(restaurantId)
       setMenuItems(items)
     } catch (error) {
       console.error('Error fetching menu items:', error)
@@ -56,6 +59,7 @@ export default function MenuPage({ restaurantId, tableId }: MenuProps) {
     e.preventDefault()
  
     try {
+      if (!restaurantId) return;
       const payload = {
         name: formData.name,
         description: formData.description,
@@ -95,6 +99,7 @@ export default function MenuPage({ restaurantId, tableId }: MenuProps) {
   }
 
   const handleDelete = async (id: string) => {
+    if (!restaurantId) return;
     if (!confirm('Are you sure you want to delete this item?')) return
    
     try {
@@ -118,6 +123,11 @@ export default function MenuPage({ restaurantId, tableId }: MenuProps) {
     })
     setEditingItem(null)
   }
+
+  if (!user) {
+    return <div>Please log in as a restaurant admin.</div>
+  }
+
 
   return (
     <div className="container mx-auto py-8">

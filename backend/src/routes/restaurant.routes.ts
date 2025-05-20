@@ -5,9 +5,13 @@ const router = Router()
 
 // Menu routes
 router.get('/menu', restaurantController.getMenu as RequestHandler)
-router.post('/menu', restaurantController.createMenuItem as RequestHandler)
-router.put('/menu/:id', restaurantController.updateMenuItem as RequestHandler)
-router.delete('/menu/:id', restaurantController.deleteMenuItem as RequestHandler)
+router.post('/:restaurantId/menu', restaurantController.createMenuItem as RequestHandler)
+router.put('/:restaurantId/menu/:id', restaurantController.updateMenuItem as RequestHandler)
+router.patch('/:restaurantId/menu/:id', restaurantController.updateMenuItem as RequestHandler)
+router.delete('/:restaurantId/menu/:id', restaurantController.deleteMenuItem as RequestHandler)
+
+// Add this route for admin menu fetching
+router.get('/admin-menu/:restaurantId', restaurantController.getAdminMenu as RequestHandler);
 
 // Restaurant routes
 router.post('/', restaurantController.createRestaurant as RequestHandler)
