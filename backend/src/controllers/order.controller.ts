@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express'
 import { prisma } from '../utils/db'
 import { z } from 'zod'
 import Pusher from 'pusher'
+import { AppError } from '../utils/errors'
 
 // Initialize Pusher
 const pusher = new Pusher({
@@ -82,8 +83,7 @@ export const orderController = {
 
       res.status(201).json({ success: true, data: order })
     } catch (error) {
-      console.error('Error creating order:', error)
-      res.status(500).json({ error: 'Failed to create order' })
+      next(error instanceof Error ? error : new AppError('Failed to create order', 500))
     }
   },
 
@@ -105,8 +105,7 @@ export const orderController = {
       })
       res.json({ success: true, data: orders })
     } catch (error) {
-      console.error('Error fetching orders:', error)
-      res.status(500).json({ error: 'Failed to fetch orders' })
+      next(error instanceof Error ? error : new AppError('Failed to fetch orders', 500))
     }
   },
 
@@ -126,12 +125,11 @@ export const orderController = {
         }
       })
       if (!order) {
-        res.status(404).json({ success: false, error: 'Order not found' })
-        return
+        return next(new AppError('Order not found', 404))
       }
       res.json({ success: true, data: order })
     } catch (error) {
-      next(error)
+      next(error instanceof Error ? error : new AppError('Failed to fetch order', 500))
     }
   },
 
@@ -164,8 +162,7 @@ export const orderController = {
 
       res.json({ success: true, data: order })
     } catch (error) {
-      console.error('Error updating order status:', error)
-      res.status(500).json({ error: 'Failed to update order status' })
+      next(error instanceof Error ? error : new AppError('Failed to update order status', 500))
     }
   }
 }

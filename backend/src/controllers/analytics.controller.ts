@@ -1,5 +1,6 @@
-import { Request, Response } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { AppError } from '../utils/errors'
 
 const prisma = new PrismaClient()
 
@@ -12,13 +13,12 @@ interface User {
 }
 
 
-export const getAnalytics = async (req: Request, res: Response): Promise<void> => {
+export const getAnalytics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { restaurantId } = req.params
 
     if (!restaurantId) {
-      res.status(400).json({ error: 'Restaurant ID is required' })
-      return
+      return next(new AppError('Restaurant ID is required', 400))
     }
 
     // Get current date and start of month
@@ -99,12 +99,14 @@ export const getAnalytics = async (req: Request, res: Response): Promise<void> =
     }))
 
     res.json({
-      totalOrdersThisMonth,
-      revenuePerDay: formattedRevenuePerDay,
-      topItems: topItemsWithDetails,
+      success: true,
+      data: {
+        totalOrdersThisMonth,
+        revenuePerDay: formattedRevenuePerDay,
+        topItems: topItemsWithDetails,
+      }
     })
   } catch (error) {
-    console.error('Error fetching analytics:', error)
-    res.status(500).json({ error: 'Failed to fetch analytics' })
+    next(error instanceof Error ? error : new AppError('Failed to fetch analytics', 500))
   }
 }

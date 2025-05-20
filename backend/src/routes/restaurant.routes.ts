@@ -11,7 +11,7 @@ router.patch('/:restaurantId/menu/:id', restaurantController.updateMenuItem as R
 router.delete('/:restaurantId/menu/:id', restaurantController.deleteMenuItem as RequestHandler)
 
 // Add this route for admin menu fetching
-router.get('/admin-menu/:restaurantId', restaurantController.getAdminMenu as RequestHandler);
+router.get('/admin-menu/:restaurantId', restaurantController.getAdminMenu as RequestHandler)
 
 // Restaurant routes (user-specific)
 router.post('/user/:userId/restaurant', restaurantController.createRestaurant as RequestHandler)

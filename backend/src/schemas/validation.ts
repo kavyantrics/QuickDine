@@ -25,6 +25,14 @@ export const CreateRestaurantSchema = RestaurantSchema.extend({
 
 export const UpdateRestaurantSchema = RestaurantSchema.partial()
 
+export const RestaurantRegistrationSchema = RestaurantSchema.extend({
+  numberOfTables: z.number().int().min(1, 'Must have at least 1 table'),
+  tableCapacity: z.number().int().min(1).default(4),
+  adminName: z.string().min(2, 'Admin name must be at least 2 characters'),
+  adminEmail: z.string().email('Invalid admin email format'),
+  adminPassword: z.string().min(8, 'Password must be at least 8 characters')
+})
+
 // User schemas
 export const UserSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),

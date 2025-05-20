@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { UserRole } from '@prisma/client'
 import { hashPassword, verifyPassword, isStrongPassword } from '../middleware/auth'
+import { AppError } from '../utils/errors'
 
 // Validation schemas
 const SignupSchema = z.object({
@@ -53,10 +54,7 @@ export const authController = {
       const userData = SignupSchema.parse(req.body)
 
       if (!isStrongPassword(userData.password)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.'
-        })
+        return next(new AppError('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.', 400))
       }
 
       // Check if user already exists
@@ -65,10 +63,7 @@ export const authController = {
       })
 
       if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          error: 'User already exists'
-        })
+        return next(new AppError('User already exists', 400))
       }
 
       // Hash password
@@ -134,20 +129,14 @@ export const authController = {
       })
 
       if (!user) {
-        return res.status(401).json({
-          success: false,
-          error: 'Invalid credentials'
-        })
+        return next(new AppError('Invalid credentials', 401))
       }
 
       // Verify password
       const isValidPassword = await verifyPassword(password, user.password)
 
       if (!isValidPassword) {
-        return res.status(401).json({
-          success: false,
-          error: 'Invalid credentials'
-        })
+        return next(new AppError('Invalid credentials', 401))
       }
 
       // Generate tokens
@@ -187,10 +176,10 @@ export const authController = {
   }) as RequestHandler,
 
   // Refresh token endpoint
-  refresh: async (req: Request, res: Response) => {
+  refresh: async (req: Request, res: Response, next: NextFunction) => {
     const { refreshToken } = req.body
     if (!refreshToken) {
-      return res.status(400).json({ success: false, error: 'Refresh token required' })
+      return next(new AppError('Refresh token required', 400))
     }
     try {
       // Verify refresh token
@@ -200,30 +189,30 @@ export const authController = {
         where: { sessionToken: refreshToken }
       })
       if (!session || !session.isValid) {
-        return res.status(401).json({ success: false, error: 'Invalid refresh token' })
+        return next(new AppError('Invalid refresh token', 401))
       }
       // Get user
       const user = await prisma.user.findUnique({ where: { id: payload.userId } })
       if (!user) {
-        return res.status(401).json({ success: false, error: 'User not found' })
+        return next(new AppError('User not found', 401))
       }
       // Generate new access token
       const accessToken = generateAccessToken(user)
       res.json({ success: true, data: { accessToken } })
     } catch (error) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired refresh token' })
+      next(new AppError('Invalid or expired refresh token', 401))
     }
   },
 
   // PATCH /api/users/:id
-  updateUser: async (req: Request, res: Response) => {
+  updateUser: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params
       const { name, email, role } = req.body
 
       // Validate role if provided
       if (role && !Object.values(UserRole).includes(role)) {
-        return res.status(400).json({ error: 'Invalid role' })
+        return next(new AppError('Invalid role', 400))
       }
 
       const user = await prisma.user.update({
@@ -238,7 +227,7 @@ export const authController = {
       res.json({ success: true, data: user })
     } catch (error) {
       console.error('Error updating user:', error)
-      res.status(500).json({ error: 'Failed to update user' })
+      next(new AppError('Failed to update user', 500))
     }
   }
 }

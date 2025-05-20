@@ -4,11 +4,11 @@ import authRoutes from './auth.routes'
 import restaurantRoutes from './restaurant.routes'
 import analyticsRoutes from './analytics.routes'
 
-const router = Router()
+const v1Router = Router()
 
-router.use('/orders', orderRoutes)
-router.use('/restaurants', restaurantRoutes)
-router.use('/auth', authRoutes)
-router.use('/analytics', analyticsRoutes)
+v1Router.use('/orders', orderRoutes)
+v1Router.use('/restaurants', restaurantRoutes)
+v1Router.use('/auth', authRoutes)
+v1Router.use('/analytics', analyticsRoutes)
 
-export default router
+export default v1Router

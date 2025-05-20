@@ -1,67 +1,17 @@
 import { Request, Response, NextFunction } from 'express'
 import { prisma } from '../utils/db'
-import { z } from 'zod'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-
-// Validation schema for restaurant registration
-const RestaurantRegistrationSchema = z.object({
-  // Restaurant details
-  name: z.string().min(2, 'Restaurant name must be at least 2 characters'),
-  email: z.string().email('Invalid email format'),
-  description: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
-  logo: z.string().optional(),
-  numberOfTables: z.number().int().min(1, 'Must have at least 1 table'),
-  tableCapacity: z.number().int().min(1).default(4),
-  
-  // Admin details
-  adminName: z.string().min(2, 'Admin name must be at least 2 characters'),
-  adminEmail: z.string().email('Invalid admin email format'),
-  adminPassword: z.string().min(8, 'Password must be at least 8 characters')
-})
-
-const RestaurantSchema = z.object({
-  name: z.string(),
-  email: z.string().email(),
-  description: z.string().optional(),
-  address: z.string().optional(),
-  phone: z.string().optional(),
-  logo: z.string().optional(),
-})
-
-const CreateRestaurantSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  logo: z.string().optional(),
-  address: z.string().min(1),
-  phone: z.string().min(1),
-  email: z.string().email(),
-  userId: z.string().min(1)
-})
-
-const UpdateRestaurantSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  logo: z.string().optional(),
-  address: z.string().min(1).optional(),
-  phone: z.string().min(1).optional(),
-  email: z.string().email().optional()
-})
-
-// Menu item validation schemas
-const MenuItemSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().optional(),
-  price: z.number().positive('Price must be positive'),
-  category: z.enum(['STARTER', 'MAIN_COURSE', 'DRINKS', 'DESSERT', 'SIDES', 'SNACKS', 'BREAKFAST', 'LUNCH', 'DINNER']),
-  image: z.string().optional(),
-  isAvailable: z.boolean().default(true),
-  restaurantId: z.string()
-})
-
-const UpdateMenuItemSchema = MenuItemSchema.partial().omit({ restaurantId: true })
+import { AppError } from '../utils/errors'
+import {
+  RestaurantSchema,
+  CreateRestaurantSchema,
+  UpdateRestaurantSchema,
+  MenuItemSchema,
+  UpdateMenuItemSchema,
+  RestaurantRegistrationSchema
+} from '../schemas/validation'
+import { Restaurant, MenuItem } from '../types'
 
 export const restaurantController = {
   register: async (req: Request, res: Response, next: NextFunction) => {
@@ -75,10 +25,7 @@ export const restaurantController = {
       });
 
       if (existingRestaurant) {
-        return res.status(400).json({
-          success: false,
-          error: 'Restaurant with this email already exists'
-        });
+        return next(new AppError('Restaurant with this email already exists', 400));
       }
 
       // Check if admin email already exists
@@ -87,10 +34,7 @@ export const restaurantController = {
       });
 
       if (existingAdmin) {
-        return res.status(400).json({
-          success: false,
-          error: 'Admin email already registered'
-        });
+        return next(new AppError('Admin email already registered', 400));
       }
 
       // Hash admin password

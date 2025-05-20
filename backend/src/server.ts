@@ -3,7 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { errorHandler } from './middleware/errorHandler'
 import { prisma } from './utils/db'
-import routes from './routes'
+import v1Router from './routes'
 
 // Load environment variables
 dotenv.config()
@@ -26,7 +26,7 @@ app.use(cors({
 app.use(express.json())
 
 // Routes
-app.use('/api', routes)
+app.use('/api/v1', v1Router)
 app.get('/health', async (req, res) => {
   try {
     // Test database connection
