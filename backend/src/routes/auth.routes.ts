@@ -5,6 +5,6 @@ const router = Router()
 
 router.post('/signup', authController.signup)
 router.post('/login', authController.login)
-router.patch('/users/:id', authController.updateUser)
+router.patch('/users/:id', authController.updateUser as RequestHandler)
 
 export default router

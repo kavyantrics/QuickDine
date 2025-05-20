@@ -107,7 +107,7 @@ export const restaurantController = {
             address: data.address,
             phone: data.phone,
             logo: data.logo,
-            users: {
+            staff: {
               connect: { id: userId } // Connect the userId from params
             }
           }
@@ -229,7 +229,7 @@ export const restaurantController = {
       const restaurant = await prisma.restaurant.create({
         data: {
           ...data,
-          users: {
+          staff: {
             connect: { id: userId }
           }
         }
@@ -247,10 +247,11 @@ export const restaurantController = {
       const restaurant = await prisma.restaurant.findFirst({
         where: {
           id: restaurantId,
-          users: { some: { id: userId } }
+          staff: { some: { id: userId } }
         },
         include: {
-          users: true,
+          staff: true,
+          owners: true,
           menuItems: true,
           tables: true
         }
@@ -272,7 +273,7 @@ export const restaurantController = {
       const restaurant = await prisma.restaurant.updateMany({
         where: {
           id: restaurantId,
-          users: { some: { id: userId } }
+          staff: { some: { id: userId } }
         },
         data
       })

@@ -61,7 +61,7 @@ async function main() {
       name: 'Admin User',
       email: 'admin@restaurant.com',
       password: hashedPassword,
-      role: 'admin',
+      role: 'RESTAURANT_ADMIN',
       restaurantId: restaurant.id
     }
   })

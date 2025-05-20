@@ -1,43 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
 model Restaurant {
-  id          String     @id @default(cuid())
+  id          String            @id @default(cuid())
   name        String
   description String?
   address     String?
   phone       String?
-  email       String     @unique
+  email       String            @unique
   logo        String?
-  tables      Table[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   menuItems   MenuItem[]
   orders      Order[]
-  users       User[]     // Staff members
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  owners      RestaurantOwner[]
+  tables      Table[]
+  staff       User[]
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String    // Hashed password
-  image         String?
-  role          String    @default("staff") // admin, staff
-  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
-  restaurantId  String?
-  accounts      Account[]
-  sessions      Session[]
-  orders        Order[]   // Orders created by staff
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String            @id @default(cuid())
+  name             String?
+  email            String            @unique
+  emailVerified    DateTime?
+  password         String
+  image            String?
+  restaurantId     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  role             UserRole          @default(STAFF)
+  accounts         Account[]
+  orders           Order[]
+  ownedRestaurants RestaurantOwner[]
+  sessions         Session[]
+  restaurant       Restaurant?       @relation(fields: [restaurantId], references: [id])
+}
+
+model RestaurantOwner {
+  id           String     @id @default(cuid())
+  userId       String
+  restaurantId String
+  role         UserRole   @default(RESTAURANT_OWNER)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, restaurantId])
 }
 
 model Account {
@@ -46,16 +62,16 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?  @db.Text
-  access_token      String?  @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?  @db.Text
+  id_token          String?
   session_state     String?
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -65,24 +81,105 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  ipAddress    String?
+  isValid      Boolean  @default(true)
+  userAgent    String?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Table {
-  id           String     @id @default(cuid())
+  id           String      @id @default(cuid())
   number       Int
-  capacity     Int        @default(4)
-  status       String     @default("available") // available, occupied, reserved
-  qrCode       String     @unique
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  capacity     Int         @default(4)
+  qrCode       String      @unique
   restaurantId String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  status       TableStatus @default(AVAILABLE)
   orders       Order[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
 
   @@unique([restaurantId, number])
+}
+
+model MenuItem {
+  id           String       @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  category     MenuCategory
+  image        String?
+  isAvailable  Boolean      @default(true)
+  restaurantId String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id])
+  orderItems   OrderItem[]
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  orderNumber     String        @unique
+  tableId         String
+  restaurantId    String
+  userId          String?
+  customerName    String
+  customerPhone   String
+  specialRequests String?
+  totalAmount     Float
+  paymentMethod   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id])
+  table           Table         @relation(fields: [tableId], references: [id])
+  user            User?         @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Int
+  menuItemId String
+  orderId    String
+  price      Float
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  RESTAURANT_OWNER
+  RESTAURANT_ADMIN
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
 }
 
 enum MenuCategory {
@@ -95,53 +192,4 @@ enum MenuCategory {
   BREAKFAST
   LUNCH
   DINNER
-}
-
-model MenuItem {
-  id           String       @id @default(cuid())
-  name         String
-  description  String?
-  price        Float
-  category     MenuCategory // Changed from String to MenuCategory
-  image        String?
-  isAvailable  Boolean      @default(true)
-  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id])
-  restaurantId String
-  orderItems   OrderItem[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-}
-
-model Order {
-  id             String     @id @default(cuid())
-  orderNumber    String     @unique // For display purposes (e.g., #2023001)
-  status         String     @default("pending") // pending, preparing, ready, served, cancelled
-  items          OrderItem[]
-  table          Table      @relation(fields: [tableId], references: [id])
-  tableId        String
-  restaurant     Restaurant @relation(fields: [restaurantId], references: [id])
-  restaurantId   String
-  user           User?      @relation(fields: [userId], references: [id]) // Staff who handled the order
-  userId         String?
-  customerName   String
-  customerPhone  String
-  specialRequests String?
-  totalAmount    Float
-  paymentStatus  String     @default("pending") // pending, paid, failed
-  paymentMethod  String?    // cash, card, etc.
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-}
-
-model OrderItem {
-  id         String   @id @default(cuid())
-  quantity   Int
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
-  menuItemId String
-  order      Order    @relation(fields: [orderId], references: [id])
-  orderId    String
-  price      Float    // Price at the time of order
-  notes      String?  // Special instructions for this item
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
 }

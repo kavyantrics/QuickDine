@@ -27,7 +27,7 @@ const OrderInputSchema = z.object({
 })
 
 const OrderStatusSchema = z.object({
-  status: z.enum(['pending', 'preparing', 'ready', 'served', 'cancelled']).transform(val => val.toLowerCase())
+  status: z.enum(['PENDING', 'PREPARING', 'READY', 'SERVED', 'CANCELLED'])
 })
 
 export const orderController = {
@@ -158,7 +158,7 @@ export const orderController = {
         orderId: order.id,
         status: order.status,
         orderNumber: order.orderNumber,
-        tableNumber: order.table.number,
+        tableNumber: order.table?.number,
         message: `Order #${order.orderNumber} status updated to ${order.status}`
       })
 

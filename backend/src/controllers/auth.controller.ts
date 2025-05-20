@@ -3,13 +3,14 @@ import { prisma } from '../utils/db'
 import { z } from 'zod'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
+import { UserRole } from '@prisma/client'
 
 // Validation schemas
 const SignupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string(),
-  role: z.enum(['admin', 'staff']).optional().default('staff'),
+  role: z.nativeEnum(UserRole).optional().default(UserRole.STAFF),
   restaurantId: z.string().optional() // Required for staff, optional for admin
 })
 
@@ -52,7 +53,11 @@ export const authController = {
 
       // Generate JWT
       const token = jwt.sign(
-        { userId: user.id, role: user.role },
+        { 
+          userId: user.id, 
+          role: user.role,
+          restaurantId: user.restaurantId 
+        },
         process.env.JWT_SECRET!,
         { expiresIn: '24h' }
       )
@@ -82,7 +87,14 @@ export const authController = {
 
       // Find user
       const user = await prisma.user.findUnique({
-        where: { email }
+        where: { email },
+        include: {
+          ownedRestaurants: {
+            include: {
+              restaurant: true
+            }
+          }
+        }
       })
 
       if (!user) {
@@ -104,7 +116,11 @@ export const authController = {
 
       // Generate JWT
       const token = jwt.sign(
-        { userId: user.id, role: user.role },
+        { 
+          userId: user.id, 
+          role: user.role,
+          restaurantId: user.restaurantId 
+        },
         process.env.JWT_SECRET!,
         { expiresIn: '24h' }
       )
@@ -117,7 +133,12 @@ export const authController = {
             email: user.email,
             name: user.name,
             role: user.role,
-            restaurantId: user.restaurantId
+            restaurantId: user.restaurantId,
+            ownedRestaurants: user.ownedRestaurants.map(ro => ({
+              id: ro.restaurant.id,
+              name: ro.restaurant.name,
+              role: ro.role
+            }))
           },
           token
         }
@@ -131,12 +152,22 @@ export const authController = {
   updateUser: async (req: Request, res: Response) => {
     try {
       const { id } = req.params
-      const { name, email } = req.body
-      // Add validation as needed
+      const { name, email, role } = req.body
+
+      // Validate role if provided
+      if (role && !Object.values(UserRole).includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' })
+      }
+
       const user = await prisma.user.update({
         where: { id },
-        data: { name, email }
+        data: { 
+          name, 
+          email,
+          role: role as UserRole
+        }
       })
+
       res.json({ success: true, data: user })
     } catch (error) {
       console.error('Error updating user:', error)
