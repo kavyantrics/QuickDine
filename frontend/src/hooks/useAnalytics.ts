@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { fetchAnalytics, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { fetchAnalyticsData, fetchAnalyticsByDateRange, fetchAnalyticsByCategory } from '@/store/analytics/AnalyticsThunks'
+import { useCallback } from 'react'
 
 export interface AnalyticsData {
   totalOrdersThisMonth: number
@@ -17,21 +18,27 @@ export interface AnalyticsData {
 }
 
 export function useAnalytics(restaurantId: string) {
-  const [state, setState] = useState<ApiState<AnalyticsData>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const { data: analytics, isLoading, error } = useAppSelector((state) => state.analytics)
 
   const fetchData = useCallback(async () => {
-    setState(createLoadingApiState())
-    try {
-      const data = await fetchAnalytics(restaurantId)
-      setState(createSuccessApiState(data))
-    } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to fetch analytics'))
-    }
-  }, [restaurantId])
+    await dispatch(fetchAnalyticsData(restaurantId)).unwrap()
+  }, [dispatch, restaurantId])
 
-  useEffect(() => {
-    if (restaurantId) fetchData()
-  }, [restaurantId, fetchData])
+  const fetchByDateRange = useCallback(async (startDate: string, endDate: string) => {
+    await dispatch(fetchAnalyticsByDateRange({ restaurantId, startDate, endDate })).unwrap()
+  }, [dispatch, restaurantId])
 
-  return { ...state, refetch: fetchData }
+  const fetchByCategory = useCallback(async (category: string) => {
+    await dispatch(fetchAnalyticsByCategory({ restaurantId, category })).unwrap()
+  }, [dispatch, restaurantId])
+
+  return {
+    analytics,
+    isLoading,
+    error,
+    fetchData,
+    fetchByDateRange,
+    fetchByCategory,
+  }
 }

@@ -1,15 +1,14 @@
 'use client'
 
-
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowRight, QrCode, ShoppingCart, Clock, Star, Shield, Zap } from 'lucide-react'
-import { useAuth } from '@/contexts/auth-context'
+import { useAppSelector } from '@/store/hooks'
 
 export default function HomePage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user } = useAppSelector((state) => state.auth)
 
   const handleGetStarted = () => {
     if (user) {
@@ -22,7 +21,7 @@ export default function HomePage() {
         router.push('/dashboard')
       }
     } else {
-      router.push('/restaurant/signup')
+      router.push('/auth/signup')
     }
   }
 
@@ -34,10 +33,10 @@ export default function HomePage() {
       } else if (user.role === 'STAFF') {
         router.push('/staff/dashboard')
       } else {
-        router.push('/dashboard')
+        router.push('/admin/dashboard')
       }
     } else {
-      router.push('/auth/signin')
+      router.push('/auth/login')
     }
   }
 
@@ -64,7 +63,7 @@ export default function HomePage() {
               </Button>
               <Button 
                 size="lg" 
-                variant="outline"
+                variant="secondary"
                 className="text-lg px-8 py-6"
                 onClick={handleSignIn}
               >

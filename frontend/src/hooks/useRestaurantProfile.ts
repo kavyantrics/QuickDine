@@ -1,35 +1,37 @@
-import { useState, useCallback, useEffect } from 'react'
-import { getRestaurant, updateRestaurant, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { Restaurant } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setRestaurant, setLoading, setError } from '@/store/restaurant/RestaurantSlice'
+import { getRestaurant, updateRestaurant } from '@/lib/api'
+import { useCallback, useEffect } from 'react'
 
-export function useRestaurantProfile(userId: string, restaurantId: string, initialData?: Restaurant) {
-  const [state, setState] = useState<ApiState<Restaurant>>(initialData ? createSuccessApiState(initialData) : createInitialApiState())
+export function useRestaurantProfile(userId: string, restaurantId: string) {
+  const dispatch = useAppDispatch()
+  const { data: restaurant, isLoading, error } = useAppSelector((state) => state.restaurant)
 
   const fetchRestaurant = useCallback(async () => {
     if (!userId || !restaurantId) return
-    setState(createLoadingApiState())
+    dispatch(setLoading(true))
     try {
       const data = await getRestaurant(userId, restaurantId)
-      setState(createSuccessApiState(data))
+      dispatch(setRestaurant(data))
     } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to fetch restaurant'))
+      dispatch(setError(err instanceof Error ? err.message : 'Failed to fetch restaurant'))
     }
-  }, [userId, restaurantId])
+  }, [dispatch, userId, restaurantId])
 
   useEffect(() => {
     fetchRestaurant()
   }, [fetchRestaurant])
 
-  const update = async (data: Partial<Restaurant>) => {
-    setState(createLoadingApiState())
+  const update = async (data: Partial<typeof restaurant>) => {
+    dispatch(setLoading(true))
     try {
       await updateRestaurant(userId, restaurantId, data)
       await fetchRestaurant()
     } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to update restaurant'))
+      dispatch(setError(err instanceof Error ? err.message : 'Failed to update restaurant'))
       throw err
     }
   }
 
-  return { ...state, updateRestaurant: update, refetch: fetchRestaurant }
+  return { restaurant, isLoading, error, updateRestaurant: update, refetch: fetchRestaurant }
 } 

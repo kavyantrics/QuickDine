@@ -1,14 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/contexts/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function TwoFactorSetup() {
-  const { user } = useAuth()
-  const [step, setStep] = useState<'setup' | 'verify'>('setup')
+  const [step, setStep] = useState<'setup' | 'verify' | 'success'>('setup')
   const [qrCode, setQrCode] = useState('')
   const [secret, setSecret] = useState('')
   const [token, setToken] = useState('')

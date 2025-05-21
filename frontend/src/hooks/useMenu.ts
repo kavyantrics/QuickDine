@@ -1,23 +1,31 @@
-import { useCallback, useEffect, useState } from 'react'
-import { getMenu, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { MenuItem } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setMenu, setLoading, setError } from '@/store/menu/MenuSlice'
+import { getMenu } from '@/lib/api'
+import { useEffect } from 'react'
 
 export function useMenu(restaurantId: string, tableId: string) {
-  const [state, setState] = useState<ApiState<MenuItem[]>>(createInitialApiState())
-
-  const fetchMenu = useCallback(async () => {
-    setState(createLoadingApiState())
-    try {
-      const data = await getMenu(restaurantId, tableId)
-      setState(createSuccessApiState(data))
-    } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to fetch menu'))
-    }
-  }, [restaurantId, tableId])
+  const dispatch = useAppDispatch()
+  const { items, isLoading, error } = useAppSelector((state) => state.menu)
 
   useEffect(() => {
-    if (restaurantId && tableId) fetchMenu()
-  }, [restaurantId, tableId, fetchMenu])
+    const fetchMenu = async () => {
+      try {
+        dispatch(setLoading(true))
+        const response = await getMenu(restaurantId, tableId)
+        dispatch(setMenu(response))
+      } catch (error) {
+        dispatch(setError(error instanceof Error ? error.message : 'Failed to fetch menu'))
+      } finally {
+        dispatch(setLoading(false))
+      }
+    }
 
-  return { ...state, refetch: fetchMenu }
+    fetchMenu()
+  }, [dispatch, restaurantId, tableId])
+
+  return {
+    items,
+    isLoading,
+    error,
+  }
 } 

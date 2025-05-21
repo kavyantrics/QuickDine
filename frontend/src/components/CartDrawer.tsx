@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { ShoppingCart } from 'lucide-react'
-import { useCart } from '@/contexts/cart-context'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { clearCart } from '@/store/cart/CartSlice'
 
 interface CartDrawerProps {
   restaurantId: string
@@ -13,7 +14,8 @@ interface CartDrawerProps {
 
 export function CartDrawer({ restaurantId, tableId }: CartDrawerProps) {
   const router = useRouter()
-  const { items, total, clearCart } = useCart()
+  const dispatch = useAppDispatch()
+  const { items, total } = useAppSelector((state) => state.cart)
 
   const handleCheckout = () => {
     router.push(`/${restaurantId}/${tableId}/checkout`)
@@ -56,7 +58,7 @@ export function CartDrawer({ restaurantId, tableId }: CartDrawerProps) {
               Checkout
             </Button>
             {items.length > 0 && (
-              <Button variant="outline" className="w-full mt-2" onClick={clearCart}>
+              <Button variant="outline" className="w-full mt-2" onClick={() => dispatch(clearCart())}>
                 Clear Cart
               </Button>
             )}

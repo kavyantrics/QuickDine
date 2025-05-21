@@ -1,361 +1,187 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useOrders } from '@/hooks/useOrders'
-import { useOrderMutation } from '@/hooks/useOrderMutation'
-import { Order } from '@/types'
+import { useEffect } from 'react'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { usePusher } from '@/contexts/pusher-context'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Printer, Download } from 'lucide-react'
 import AdminNavbar from '@/components/AdminNavbar'
+import { OrderStatus, PaymentStatus,
+  //  PaymentMethod 
+  } from '@/types'
+import { format } from 'date-fns'
+import {
+  fetchOrders,
+  updateOrderStatus,
+  updatePaymentStatus,
+  // updatePaymentMethod,
+  // updateOrderTable,
+  // updateOrderItems,
+  deleteOrder,
+} from '@/store/orders/OrdersThunks'
 
 export default function OrdersPage() {
-  const router = useRouter()
-  const { pusher, isConnected } = usePusher()
-  const restaurantId = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null
-  const { data: orders, isLoading, error, refetch } = useOrders(restaurantId || "")
-  const { mutate: updateStatus, isLoading: isUpdating } = useOrderMutation()
-  const [selectedBill, setSelectedBill] = useState<Order | null>(null)
-  const [optimisticOrders, setOptimisticOrders] = useState<Order[] | null>(null)
+  const dispatch = useAppDispatch()
+  const { user } = useAppSelector((state) => state.auth)
+  const { data: orders, isLoading, error } = useAppSelector((state) => state.orders)
+  const restaurantId = user?.restaurantId || ''
 
-  // Real-time updates (optional: you can keep this for Pusher integration)
-  // ... (keep your useEffect for Pusher if needed)
+  useEffect(() => {
+    if (restaurantId) {
+      dispatch(fetchOrders(restaurantId))
+    }
+  }, [dispatch, restaurantId])
 
-  // Advanced optimistic UI for status change
-  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
-    if (!orders) return
-    // Save previous state for rollback
-    const prevOrders = [...orders]
-    setOptimisticOrders(
-      orders.map(order =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    )
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     try {
-      await updateStatus({ orderId, status: newStatus })
+      await dispatch(updateOrderStatus({ restaurantId, orderId, status })).unwrap()
       toast.success('Order status updated')
-      refetch()
-    } catch (error) {
-      setOptimisticOrders(prevOrders)
+    } catch {
       toast.error('Failed to update order status')
     }
   }
 
-  // Use optimisticOrders if present, else orders from hook
-  const displayOrders = optimisticOrders || orders || []
-
-  const handleGenerateBill = (order: Order) => {
-    setSelectedBill(order)
+  const handlePaymentStatusChange = async (orderId: string, status: PaymentStatus) => {
+    try {
+      await dispatch(updatePaymentStatus({ restaurantId, orderId, status })).unwrap()
+      toast.success('Payment status updated')
+    } catch {
+      toast.error('Failed to update payment status')
+    }
   }
 
-  const handlePrintBill = () => {
-    if (!selectedBill) return
+  // const handlePaymentMethodChange = async (orderId: string, method: PaymentMethod) => {
+  //   try {
+  //     await dispatch(updatePaymentMethod({ restaurantId, orderId, method })).unwrap()
+  //     toast.success('Payment method updated')
+  //   } catch {
+  //     toast.error('Failed to update payment method')
+  //   }
+  // }
 
-    const billWindow = window.open('', '_blank', 'width=600,height=800')
-    if (!billWindow) return
+  // const handleTableChange = async (orderId: string, tableId: string) => {
+  //   try {
+  //     await dispatch(updateOrderTable({ restaurantId, orderId, tableId })).unwrap()
+  //     toast.success('Table updated')
+  //   } catch {
+  //     toast.error('Failed to update table')
+  //   }
+  // }
 
-    const billHtml = `
-      <html>
-        <head>
-          <title>Bill for Order #${selectedBill.id}</title>
-          <style>
-            @media print {
-              body { font-family: 'Courier New', monospace; }
-              .no-print { display: none; }
-            }
-            body { 
-              font-family: 'Courier New', monospace;
-              padding: 2rem;
-              max-width: 80mm;
-              margin: 0 auto;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 1rem;
-            }
-            .header h1 {
-              font-size: 1.2rem;
-              margin: 0;
-            }
-            .header p {
-              margin: 0.2rem 0;
-              font-size: 0.9rem;
-            }
-            .divider {
-              border-top: 1px dashed #000;
-              margin: 0.5rem 0;
-            }
-            .items-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 1rem 0;
-              font-size: 0.9rem;
-            }
-            .items-table th {
-              text-align: left;
-              padding: 0.2rem 0;
-            }
-            .items-table td {
-              padding: 0.2rem 0;
-            }
-            .total {
-              font-weight: bold;
-              margin-top: 1rem;
-              text-align: right;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 2rem;
-              font-size: 0.9rem;
-            }
-            .print-button {
-              position: fixed;
-              top: 1rem;
-              right: 1rem;
-              padding: 0.5rem 1rem;
-              background: #007bff;
-              color: white;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-            }
-            .print-button:hover {
-              background: #0056b3;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>QuickDine</h1>
-            <p>Restaurant Bill</p>
-            <p>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
-          </div>
-          <div class="divider"></div>
-          <div>
-            <p><strong>Order #:</strong> ${selectedBill.id}</p>
-            <p><strong>Table #:</strong> ${selectedBill.table?.number ?? '?'}</p>
-            <p><strong>Customer:</strong> ${selectedBill.customerName}</p>
-            <p><strong>Date:</strong> ${new Date(selectedBill.createdAt).toLocaleString()}</p>
-          </div>
-          <div class="divider"></div>
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${selectedBill.items.map(item => `
-                <tr>
-                  <td>${item.menuItem ? item.menuItem.name : ''}</td>
-                  <td>${item.quantity}</td>
-                  <td>$${item.menuItem ? item.menuItem.price.toFixed(2) : '0.00'}</td>
-                  <td>$${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="divider"></div>
-          <div class="total">
-            <p>Subtotal: $${((selectedBill.total ?? 0) * 0.9).toFixed(2)}</p>
-            <p>Tax (10%): $${((selectedBill.total ?? 0) * 0.1).toFixed(2)}</p>
-            <p>Total: $${((selectedBill.total ?? 0).toFixed(2))}</p>
-          </div>
-          <div class="footer">
-            <p>Thank you for dining with us!</p>
-            <p>Please visit again</p>
-          </div>
-          <button class="print-button no-print" onclick="window.print()">Print Bill</button>
-        </body>
-      </html>
-    `
+  // const handleItemsUpdate = async (orderId: string, items: { id: string; quantity: number }[]) => {
+  //   try {
+  //     await dispatch(updateOrderItems({ restaurantId, orderId, items })).unwrap()
+  //     toast.success('Order items updated')
+  //   } catch {
+  //     toast.error('Failed to update order items')
+  //   }
+  // }
 
-    billWindow.document.write(billHtml)
-    billWindow.document.close()
-    billWindow.focus()
+  const handleDelete = async (orderId: string) => {
+    if (!confirm('Are you sure you want to delete this order?')) return
+    try {
+      await dispatch(deleteOrder({ restaurantId, orderId })).unwrap()
+      toast.success('Order deleted')
+    } catch {
+      toast.error('Failed to delete order')
+    }
   }
 
-  const handleDownloadBill = () => {
-    if (!selectedBill) return
-
-    const billContent = `
-QuickDine - Restaurant Bill
-------------------------
-Order #: ${selectedBill.id}
-Table #: ${selectedBill.table?.number ?? '?'}
-Customer: ${selectedBill.customerName}
-Date: ${new Date(selectedBill.createdAt).toLocaleString()}
-
-Items:
-${selectedBill.items.map(item => 
-  `${item.menuItem ? item.menuItem.name : ''} x${item.quantity} - $${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}`
-).join('\n')}
-
-------------------------
-Subtotal: $${((selectedBill.total ?? 0) * 0.9).toFixed(2)}
-Tax (10%): $${((selectedBill.total ?? 0) * 0.1).toFixed(2)}
-Total: $${((selectedBill.total ?? 0).toFixed(2))}
-
-Thank you for dining with us!
-Please visit again
-    `
-
-    const blob = new Blob([billContent], { type: 'text/plain' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `bill-${selectedBill.id}.txt`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
+  if (!user) {
+    return <div>Please log in as a restaurant admin.</div>
   }
 
   if (isLoading) {
     return <div>Loading orders...</div>
   }
 
+  if (error) {
+    return <div>Error loading orders: {error}</div>
+  }
+
   return (
     <>
-    <AdminNavbar />
-    <div className="container mx-auto py-8">
-      <h2 className="text-2xl font-bold mb-6">Orders</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {displayOrders.length === 0 ? (
-          <p className="text-center text-gray-500 col-span-full">No orders found</p>
-        ) : (
-          displayOrders.map(order => (
-            <div key={order.id} className="bg-white rounded-lg shadow p-6 flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-lg">Table #{order.table?.number ?? '?'}</span>
-                <span className="text-sm text-gray-500">{new Date(order.createdAt).toLocaleString()}</span>
-              </div>
-              <div>
-                <span className="font-semibold">Customer:</span> {order.customerName}
-              </div>
-              <div>
-                <span className="font-semibold">Items:</span>
-                <ul className="ml-4 mt-1 space-y-1">
-                  {order.items.map((item, idx) => (
-                    <li key={idx} className="flex justify-between">
-                      <span>{item.menuItem ? item.menuItem.name : ''}</span>
-                      <span>x{item.quantity}</span>
-                      <span>${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <span className="font-bold">Total:</span>
-                <span className="font-bold text-green-600">
-                  ${((order.total ?? 0).toFixed(2))}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2 mt-4">
-                <Select
-                  value={order.status}
-                  onValueChange={(value: Order['status']) => handleStatusChange(order.id, value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Update Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="preparing">Preparing</SelectItem>
-                    <SelectItem value="ready">Ready</SelectItem>
-                    <SelectItem value="served">Served</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleGenerateBill(order)}
-                  className="flex items-center gap-2"
-                >
-                  <Printer className="w-4 h-4" />
-                  Generate Bill
-                </Button>
-              </div>
-            </div>
-          ))
-        )}
+      <AdminNavbar />
+      <div className="container mx-auto py-8">
+        <h1 className="text-3xl font-bold mb-8">Orders</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {orders?.map((order) => (
+            <Card key={order.id}>
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center">
+                  <span>Order #{order.id}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(order.id)}
+                  >
+                    Delete
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(order.createdAt), 'PPpp')}
+                    </p>
+                    <p className="font-medium">Table {order.tableId}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Items:</p>
+                    <ul className="list-disc list-inside">
+                      {order.items.map((item) => (
+                        <li key={item.id}>
+                          {item.name} x {item.quantity}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium">Total: ${order.total.toFixed(2)}</p>
+                    <p className="text-sm">
+                      Status: {order.status}
+                    </p>
+                    <p className="text-sm">
+                      Payment: {order.paymentStatus} ({order.paymentMethod})
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusChange(order.id, OrderStatus.PREPARING)}
+                      disabled={order.status === OrderStatus.PREPARING}
+                    >
+                      Preparing
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusChange(order.id, OrderStatus.READY)}
+                      disabled={order.status === OrderStatus.READY}
+                    >
+                      Ready
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusChange(order.id, OrderStatus.COMPLETED)}
+                      disabled={order.status === OrderStatus.COMPLETED}
+                    >
+                      Completed
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handlePaymentStatusChange(order.id, PaymentStatus.PAID)}
+                      disabled={order.paymentStatus === PaymentStatus.PAID}
+                    >
+                      Mark Paid
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
-
-      <Dialog open={!!selectedBill} onOpenChange={() => setSelectedBill(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Bill Preview</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="text-center">
-              <h3 className="text-lg font-bold">QuickDine</h3>
-              <p className="text-sm text-gray-500">Restaurant Bill</p>
-            </div>
-            <div className="space-y-2">
-              <p><strong>Order #:</strong> {selectedBill?.id}</p>
-              <p><strong>Table #:</strong> {selectedBill?.table?.number ?? '?'}</p>
-              <p><strong>Customer:</strong> {selectedBill?.customerName}</p>
-              <p><strong>Date:</strong> {selectedBill && new Date(selectedBill.createdAt).toLocaleString()}</p>
-            </div>
-            <div className="border-t border-b py-2">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left">
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedBill?.items.map((item, idx) => (
-                    <tr key={idx}>
-                      <td>{item.menuItem ? item.menuItem.name : ''}</td>
-                      <td>{item.quantity}</td>
-                      <td>${item.menuItem ? item.menuItem.price.toFixed(2) : '0.00'}</td>
-                      <td>${item.menuItem ? (item.menuItem.price * item.quantity).toFixed(2) : '0.00'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="text-right space-y-1">
-              <p>Subtotal: ${selectedBill && ((selectedBill.total ?? 0) * 0.9).toFixed(2)}</p>
-              <p>Tax (10%): ${selectedBill && ((selectedBill.total ?? 0) * 0.1).toFixed(2)}</p>
-              <p className="font-bold">Total: ${selectedBill && ((selectedBill.total ?? 0).toFixed(2))}</p>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={handleDownloadBill} className="flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Download
-              </Button>
-              <Button onClick={handlePrintBill} className="flex items-center gap-2">
-                <Printer className="w-4 h-4" />
-                Print
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>  
     </>
   )
 }

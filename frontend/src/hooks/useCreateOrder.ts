@@ -1,22 +1,39 @@
-import { useState } from 'react'
-import { submitOrder, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { Order } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { addOrder, setError } from '@/store/orders/OrdersSlice'
+import { submitOrder } from '@/lib/api'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 export function useCreateOrder() {
-  const [state, setState] = useState<ApiState<Order>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const router = useRouter()
+  const { isLoading, error } = useAppSelector((state) => state.orders)
 
-  const mutate = async (orderData: any) => {
-    setState(createLoadingApiState())
+  const createOrder = async (data: {
+    restaurantId: string
+    tableId: string
+    customerName: string
+    customerPhone: string
+    items: {
+      menuItemId: string
+      quantity: number
+    }[]
+  }) => {
     try {
-      const data = await submitOrder(orderData)
-      setState(createSuccessApiState(data))
-      return data
-    } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to create order'))
-      throw err
+      const order = await submitOrder(data)
+      dispatch(addOrder(order))
+      toast.success('Order created successfully')
+      router.push(`/${data.restaurantId}/${data.tableId}/order-confirmation`)
+    } catch (error) {
+      dispatch(setError(error instanceof Error ? error.message : 'Failed to create order'))
+      toast.error('Failed to create order')
+      throw error
     }
   }
 
-  const reset = () => setState(createInitialApiState())
-  return { ...state, mutate, reset }
+  return {
+    createOrder,
+    isLoading,
+    error,
+  }
 }

@@ -1,66 +1,69 @@
-import { MenuItem, Order, Restaurant } from '@/types'
+import axios from 'axios'
+import type { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
+import { MenuItem, Order, Restaurant, LoginResponse, SignupRestaurantData, OrderData, AnalyticsData } from '@/types/index'
+import { ApiResponse } from '@/store/types'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/V1'
 
-interface LoginResponse {
-  success: boolean
-  data: {
-    user: {
-      id: string
-      email: string
-      name: string
-      role: string
-      restaurantId: string
-      ownedRestaurants?: Array<{
-        id: string
-        name: string
-        role: string
-      }>
+export const api = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Add a request interceptor to add the auth token
+api.interceptors.request.use(
+  (config: AxiosRequestConfig) => {
+    const token = localStorage.getItem('accessToken')
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`
     }
-    accessToken: string
-    refreshToken: string
+    return config
+  },
+  (error: AxiosError) => {
+    return Promise.reject(error)
   }
-}
+)
 
-interface SignupRestaurantData {
-  name: string
-  email: string
-  password: string
-  address?: string
-  phone?: string
-}
+// Add a response interceptor to handle token refresh
+api.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
 
-interface OrderData {
-  restaurantId: string
-  tableId: string
-  customerName: string
-  customerPhone: string
-  items: {
-    menuItemId: string
-    quantity: number
-  }[]
-}
+    // If the error is 401 and we haven't tried to refresh the token yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
 
-interface AnalyticsData {
-  totalOrdersThisMonth: number
-  revenuePerDay: Array<{
-    date: string
-    revenue: number
-  }>
-  topItems: Array<{
-    id: string
-    name: string
-    price: number
-    category: string
-    totalQuantity: number
-  }>
-}
+      try {
+        const refreshToken = localStorage.getItem('refreshToken')
+        if (!refreshToken) throw new Error('No refresh token')
 
-interface ApiResponse<T> {
-  success: boolean
-  data: T
-  error?: string
-}
+        const response = await api.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', { refreshToken })
+        const result = await handleResponse<ApiResponse<{ accessToken: string }>>(response)
+        const { accessToken } = result.data
+
+        localStorage.setItem('accessToken', accessToken)
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+        }
+
+        // Retry the original request with the new token
+        return api(originalRequest)
+      } catch (refreshError) {
+        // If refresh fails, clear auth and redirect to login
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        delete api.defaults.headers.common['Authorization']
+        window.location.href = '/login'
+        return Promise.reject(refreshError)
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
 
 // Generic API state type
 export interface ApiState<T> {
@@ -89,69 +92,45 @@ export function createSuccessApiState<T>(data: T): ApiState<T> {
   return { data, error: null, isLoading: false }
 }
 
-// Helper function to handle API responses
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'An error occurred' }))
-    throw new Error(error.message || 'Failed to fetch data')
+async function handleResponse<T>(response: AxiosResponse): Promise<T> {
+  if (!response.data.success) {
+    throw new Error(response.data.message || 'Request failed')
   }
-  return response.json()
+  return response.data
 }
 
 // Get menu items for a restaurant and table
 export async function getMenu(restaurantId: string, tableId: string): Promise<MenuItem[]> {
-  const response = await fetch(
-    `${API_URL}/api/v1/restaurants/menu?restaurantId=${restaurantId}&tableId=${tableId}`
-  )
+  const response = await api.get<ApiResponse<MenuItem[]>>(`/restaurants/menu?restaurantId=${restaurantId}&tableId=${tableId}`)
   const result = await handleResponse<ApiResponse<MenuItem[]>>(response)
   return result.data
 }
 
 // Submit a new order
 export async function submitOrder(data: OrderData): Promise<Order> {
-  const response = await fetch(`${API_URL}/api/v1/orders`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
-  return handleResponse<Order>(response)
+  const response = await api.post<ApiResponse<Order>>('/orders', data)
+  const result = await handleResponse<ApiResponse<Order>>(response)
+  return result.data
 }
 
 // Login restaurant
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  })
-  return handleResponse<LoginResponse>(response)
+  const response = await api.post<ApiResponse<LoginResponse>>('/auth/login', { email, password })
+  const result = await handleResponse<ApiResponse<LoginResponse>>(response)
+  return result.data
 }
 
 // Signup new restaurant
 export async function signupRestaurant(data: SignupRestaurantData): Promise<Restaurant> {
-  const response = await fetch(`${API_URL}/api/v1/restaurants`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
-  return handleResponse<Restaurant>(response)
+  const response = await api.post<ApiResponse<Restaurant>>('/restaurants', data)
+  const result = await handleResponse<ApiResponse<Restaurant>>(response)
+  return result.data
 }
 
 // Get orders for a restaurant
 export async function getOrders(restaurantId: string): Promise<Order[]> {
-  const response = await fetch(`${API_URL}/api/v1/orders/restaurant/${restaurantId}`, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-  const result = await handleResponse<{ success: boolean; data: Order[] }>(response)
+  const response = await api.get<ApiResponse<Order[]>>(`/orders/restaurant/${restaurantId}`)
+  const result = await handleResponse<ApiResponse<Order[]>>(response)
   return result.data
 }
 
@@ -160,62 +139,35 @@ export async function updateOrderStatus(
   orderId: string,
   status: Order['status']
 ): Promise<Order> {
-  const response = await fetch(`${API_URL}/api/v1/orders/${orderId}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ status }),
-  })
-  return handleResponse<Order>(response)
+  const response = await api.patch<ApiResponse<Order>>(`/orders/${orderId}/status`, { status })
+  const result = await handleResponse<ApiResponse<Order>>(response)
+  return result.data
 }
 
 // Get restaurant details
 export async function getRestaurant(userId: string, restaurantId: string): Promise<Restaurant> {
-  const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant/${restaurantId}`);
-  if (!response.ok) throw new Error('Failed to fetch restaurant');
-  const result = await response.json();
-  return result.data;
+  const response = await api.get<ApiResponse<Restaurant>>(`/restaurants/user/${userId}/restaurant/${restaurantId}`)
+  const result = await handleResponse<ApiResponse<Restaurant>>(response)
+  return result.data
 }
 
 // Update restaurant details
 export async function updateRestaurant(
   userId: string,
   restaurantId: string,
-  data: Partial<{
-    name: string
-    address: string
-    phone: string
-    description: string
-    logo: string
-    email: string
-  }>
-) {
-  const response = await fetch(
-    `${API_URL}/api/v1/restaurants/user/${userId}/restaurant/${restaurantId}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }
-  )
-  if (!response.ok) throw new Error('Failed to update restaurant')
-  const result = await response.json()
+  data: Partial<Restaurant>
+): Promise<Restaurant> {
+  const response = await api.patch<ApiResponse<Restaurant>>(`/restaurants/user/${userId}/restaurant/${restaurantId}`, data)
+  const result = await handleResponse<ApiResponse<Restaurant>>(response)
   return result.data
 }
 
-// Add menu item
-export async function addMenuItem(
+// Create menu item
+export async function createMenuItem(
   restaurantId: string,
   data: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<MenuItem> {
-  const response = await fetch(`${API_URL}/api/v1/restaurants/${restaurantId}/menu`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  })
+  const response = await api.post<ApiResponse<MenuItem>>(`/restaurants/${restaurantId}/menu`, data)
   const result = await handleResponse<ApiResponse<MenuItem>>(response)
   return result.data
 }
@@ -226,16 +178,7 @@ export async function updateMenuItem(
   menuItemId: string,
   data: Partial<Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<MenuItem> {
-  const response = await fetch(
-    `${API_URL}/api/v1/restaurants/${restaurantId}/menu/${menuItemId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }
-  )
+  const response = await api.patch<ApiResponse<MenuItem>>(`/restaurants/${restaurantId}/menu/${menuItemId}`, data)
   const result = await handleResponse<ApiResponse<MenuItem>>(response)
   return result.data
 }
@@ -245,84 +188,65 @@ export async function deleteMenuItem(
   restaurantId: string,
   menuItemId: string
 ): Promise<void> {
-  const response = await fetch(
-    `${API_URL}/api/v1/restaurants/${restaurantId}/menu/${menuItemId}`,
-    {
-      method: 'DELETE',
-    }
-  )
-  if (!response.ok) {
-    throw new Error('Failed to delete menu item')
-  }
+  const response = await api.delete<ApiResponse<void>>(`/restaurants/${restaurantId}/menu/${menuItemId}`)
+  await handleResponse<ApiResponse<void>>(response)
 }
 
-export async function fetchAnalytics(restaurantId: string): Promise<AnalyticsData> {
-  const response = await fetch(`${API_URL}/api/v1/analytics/${restaurantId}`)
+interface AnalyticsFilters {
+  startDate?: string
+  endDate?: string
+  category?: string
+}
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch analytics')
-  }
+export async function fetchAnalytics(restaurantId: string, filters?: AnalyticsFilters): Promise<AnalyticsData> {
+  const queryParams = new URLSearchParams()
+  if (filters?.startDate) queryParams.append('startDate', filters.startDate)
+  if (filters?.endDate) queryParams.append('endDate', filters.endDate)
+  if (filters?.category) queryParams.append('category', filters.category)
 
-  return response.json()
+  const response = await api.get<ApiResponse<AnalyticsData>>(`/analytics/${restaurantId}?${queryParams.toString()}`)
+  const result = await handleResponse<ApiResponse<AnalyticsData>>(response)
+  return result.data
 }
 
 export async function getAdminMenu(restaurantId: string): Promise<MenuItem[]> {
-  const response = await fetch(
-    `${API_URL}/api/v1/restaurants/admin-menu/${restaurantId}`
-  );
-  const result = await handleResponse<{ success: boolean; data: MenuItem[] }>(response);
-  return result.data;
+  const response = await api.get<ApiResponse<MenuItem[]>>(`/restaurants/admin-menu/${restaurantId}`)
+  const result = await handleResponse<ApiResponse<MenuItem[]>>(response)
+  return result.data
 }
 
-export async function updateUser(
+// Update user profile
+export async function updateUserProfile(
   userId: string,
   data: { name?: string; email?: string }
-) {
-  const response = await fetch(
-    `${API_URL}/api/v1/auth/users/${userId}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }
-  )
-  if (!response.ok) throw new Error('Failed to update user')
-  const result = await response.json()
-  return result.data
+): Promise<void> {
+  const response = await api.patch<ApiResponse<void>>(`/auth/users/${userId}`, data)
+  await handleResponse<ApiResponse<void>>(response)
 }
 
 // Create restaurant
-export async function createRestaurant(userId: string, data: any) {
-  const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) throw new Error('Failed to create restaurant')
-  const result = await response.json()
+export async function createRestaurant(
+  userId: string,
+  data: { name: string; address: string; phone: string }
+): Promise<Restaurant> {
+  const response = await api.post<ApiResponse<Restaurant>>(`/restaurants/user/${userId}/restaurant`, data)
+  const result = await handleResponse<ApiResponse<Restaurant>>(response)
   return result.data
 }
 
-// Register restaurant (if needed)
-export async function registerRestaurant(userId: string, data: any) {
-  const response = await fetch(`${API_URL}/api/v1/restaurants/user/${userId}/restaurant/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!response.ok) throw new Error('Failed to register restaurant')
-  const result = await response.json()
+// Register restaurant
+export async function registerRestaurant(
+  userId: string,
+  data: { name: string; address: string; phone: string }
+): Promise<Restaurant> {
+  const response = await api.post<ApiResponse<Restaurant>>(`/restaurants/user/${userId}/restaurant/register`, data)
+  const result = await handleResponse<ApiResponse<Restaurant>>(response)
   return result.data
 }
 
 // Refresh token
-export async function refreshToken(refreshToken: string): Promise<{ success: boolean; data: { accessToken: string } }> {
-  const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refreshToken }),
-  })
-  return handleResponse<{ success: boolean; data: { accessToken: string } }>(response)
+export async function refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
+  const response = await api.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', { refreshToken })
+  const result = await handleResponse<ApiResponse<{ accessToken: string }>>(response)
+  return result.data
 } 

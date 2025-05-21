@@ -1,22 +1,23 @@
-import { useState } from 'react'
-import { registerRestaurant, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { Restaurant } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setRestaurant, setLoading, setError } from '@/store/restaurant/RestaurantSlice'
+import { registerRestaurant } from '@/lib/api'
+import { Restaurant } from '@/store/restaurant/Types'
 
 export function useRegisterRestaurant() {
-  const [state, setState] = useState<ApiState<Restaurant>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const { isLoading, error } = useAppSelector((state) => state.restaurant)
 
   const mutate = async (userId: string, data: Partial<Restaurant>) => {
-    setState(createLoadingApiState())
+    dispatch(setLoading(true))
     try {
       const registered = await registerRestaurant(userId, data)
-      setState(createSuccessApiState(registered))
+      dispatch(setRestaurant(registered))
       return registered
     } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to register restaurant'))
+      dispatch(setError(err instanceof Error ? err.message : 'Failed to register restaurant'))
       throw err
     }
   }
 
-  const reset = () => setState(createInitialApiState())
-  return { ...state, registerRestaurant: mutate, reset }
+  return { isLoading, error, registerRestaurant: mutate }
 } 

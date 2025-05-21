@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
-import { getRestaurant, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { Restaurant } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setRestaurant, setLoading, setError } from '@/store/restaurant/RestaurantSlice'
+import { getRestaurant } from '@/lib/api'
+import { useCallback, useEffect } from 'react'
 
 export function useRestaurant(userId: string, restaurantId: string) {
-  const [state, setState] = useState<ApiState<Restaurant>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const { data: restaurant, isLoading, error } = useAppSelector((state) => state.restaurant)
 
   const fetchRestaurant = useCallback(async () => {
-    setState(createLoadingApiState())
+    if (!userId || !restaurantId) return
+    dispatch(setLoading(true))
     try {
       const data = await getRestaurant(userId, restaurantId)
-      setState(createSuccessApiState(data))
+      dispatch(setRestaurant(data))
     } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to fetch restaurant'))
+      dispatch(setError(err instanceof Error ? err.message : 'Failed to fetch restaurant'))
     }
-  }, [userId, restaurantId])
+  }, [dispatch, userId, restaurantId])
 
   useEffect(() => {
     if (userId && restaurantId) fetchRestaurant()
   }, [userId, restaurantId, fetchRestaurant])
 
-  return { ...state, refetch: fetchRestaurant }
+  return { restaurant, isLoading, error, refetch: fetchRestaurant }
 }

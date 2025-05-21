@@ -1,23 +1,31 @@
-import { useCallback, useEffect, useState } from 'react'
-import { getOrders, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { Order } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setOrders, setLoading, setError } from '@/store/orders/OrdersSlice'
+import { getOrders } from '@/lib/api'
+import { useEffect } from 'react'
 
 export function useOrders(restaurantId: string) {
-  const [state, setState] = useState<ApiState<Order[]>>(createInitialApiState())
-
-  const fetchOrders = useCallback(async () => {
-    setState(createLoadingApiState())
-    try {
-      const data = await getOrders(restaurantId)
-      setState(createSuccessApiState(data))
-    } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to fetch orders'))
-    }
-  }, [restaurantId])
+  const dispatch = useAppDispatch()
+  const { orders, isLoading, error } = useAppSelector((state) => state.orders)
 
   useEffect(() => {
-    if (restaurantId) fetchOrders()
-  }, [restaurantId, fetchOrders])
+    const fetchOrders = async () => {
+      try {
+        dispatch(setLoading(true))
+        const response = await getOrders(restaurantId)
+        dispatch(setOrders(response))
+      } catch (error) {
+        dispatch(setError(error instanceof Error ? error.message : 'Failed to fetch orders'))
+      } finally {
+        dispatch(setLoading(false))
+      }
+    }
 
-  return { ...state, refetch: fetchOrders }
+    fetchOrders()
+  }, [dispatch, restaurantId])
+
+  return {
+    orders,
+    isLoading,
+    error,
+  }
 } 

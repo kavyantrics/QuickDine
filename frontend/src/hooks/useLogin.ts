@@ -1,26 +1,27 @@
-import { useState } from 'react'
-import { login, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { User } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { loginUser } from '@/store/auth/AuthThunks'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 export function useLogin() {
-  const [state, setState] = useState<ApiState<{ user: User; accessToken: string; refreshToken: string }>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const router = useRouter()
+  const { isLoading, error } = useAppSelector((state) => state.auth)
 
-  const mutate = async (email: string, password: string) => {
-    setState(createLoadingApiState())
+  const login = async (email: string, password: string) => {
     try {
-      const response = await login(email, password)
-      if (response.success && response.data) {
-        setState(createSuccessApiState(response.data))
-        return response.data
-      } else {
-        throw new Error('Invalid login response')
-      }
-    } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to login'))
-      throw err
+      await dispatch(loginUser({ email, password })).unwrap()
+      toast.success('Login successful!')
+      router.push('/admin/dashboard')
+    } catch (error) {
+      toast.error('Login failed. Please try again.')
+      throw error
     }
   }
 
-  const reset = () => setState(createInitialApiState())
-  return { ...state, loginUser: mutate, reset }
+  return {
+    login,
+    isLoading,
+    error,
+  }
 } 

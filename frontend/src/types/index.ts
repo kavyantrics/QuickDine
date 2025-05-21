@@ -6,44 +6,58 @@ export interface MenuItem {
   description: string
   price: number
   category: MenuCategory
-  image: string
+  image?: string
   isAvailable: boolean
+  stock: number
   restaurantId: string
-  createdAt: Date
-  updatedAt: Date
-}
+  createdAt: string
+  updatedAt: string
+} 
 
 export interface CartItem extends MenuItem {
   quantity: number
 }
 
 export interface OrderItem {
-  menuItemId: string
+  id: string
+  name: string
   quantity: number
-  notes?: string
-  price?: number
-  menuItem?: MenuItem
+  price: number
 }
 
-export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+export enum OrderStatus {
+  PENDING = 'PENDING',
+  PREPARING = 'PREPARING',
+  READY = 'READY',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED'
+}
+
+export enum PaymentMethod {
+  CASH = 'CASH',
+  CARD = 'CARD',
+  UPI = 'UPI',
+  WALLET = 'WALLET'
+}
 
 export interface Order {
   id: string
   restaurantId: string
   tableId: string
-  customerName: string
-  customerPhone: string
   items: OrderItem[]
   status: OrderStatus
+  paymentStatus: PaymentStatus
+  paymentMethod: PaymentMethod
   total: number
-  createdAt: Date
-  updatedAt: Date
-  orderNumber?: string
-  table?: {
-    id: string
-    number: number
-    capacity: number
-  }
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Restaurant {
@@ -60,8 +74,12 @@ export interface Restaurant {
 
 export interface Table {
   id: string
-  number: number
   restaurantId: string
+  number: string
+  capacity: number
+  status: 'available' | 'occupied' | 'reserved'
+  createdAt: string
+  updatedAt: string
 } 
 
 export interface UpdateOrderStatusInput {
@@ -80,4 +98,76 @@ export interface User {
     name: string
     role: string
   }>
+} 
+
+export interface LoginResponse {
+  success: boolean
+  data: {
+    user: {
+      id: string
+      email: string
+      name: string
+      role: string
+      restaurantId: string
+      ownedRestaurants?: Array<{
+        id: string
+        name: string
+        role: string
+      }>
+    }
+    accessToken: string
+    refreshToken: string
+  }
+}
+
+export interface SignupRestaurantData {
+  name: string
+  email: string
+  password: string
+  address?: string
+  phone?: string
+}
+
+export interface OrderData {
+  restaurantId: string
+  tableId: string
+  customerName: string
+  customerPhone: string
+  items: {
+    menuItemId: string
+    quantity: number
+  }[]
+}
+
+export interface AnalyticsData {
+  totalOrdersThisMonth: number
+  revenuePerDay: Array<{
+    date: string
+    revenue: number
+  }>
+  topItems: Array<{
+    id: string
+    name: string
+    price: number
+    category: string
+    totalQuantity: number
+  }>
+}
+
+
+export interface ApiState<T> {
+  data: T | null
+  error: string | null
+  isLoading: boolean
+}
+
+export interface AnalyticsFilters {
+  startDate?: string
+  endDate?: string
+  category?: string
+}
+
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
 } 

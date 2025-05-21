@@ -1,20 +1,20 @@
-import { useState } from 'react'
-import { deleteMenuItem, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setLoading, setError } from '@/store/menu/MenuSlice'
+import { deleteMenuItem } from '@/lib/api'
 
 export function useDeleteMenuItem() {
-  const [state, setState] = useState<ApiState<null>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const { isLoading, error } = useAppSelector((state) => state.menu)
 
   const mutate = async (restaurantId: string, menuItemId: string) => {
-    setState(createLoadingApiState())
+    dispatch(setLoading(true))
     try {
       await deleteMenuItem(restaurantId, menuItemId)
-      setState(createSuccessApiState(null))
     } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to delete menu item'))
+      dispatch(setError(err instanceof Error ? err.message : 'Failed to delete menu item'))
       throw err
     }
   }
 
-  const reset = () => setState(createInitialApiState())
-  return { ...state, mutate, reset }
+  return { isLoading, error, mutate }
 }

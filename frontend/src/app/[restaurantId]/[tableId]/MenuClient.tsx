@@ -6,6 +6,9 @@ import { CartDrawer } from '@/components/CartDrawer'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MenuItem } from '@/types'
+import { useAppSelector } from '@/store/hooks'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 interface MenuClientProps {
   restaurantId: string
@@ -33,9 +36,31 @@ const formatCategoryName = (category: string) => {
 }
 
 export default function MenuClient({ restaurantId, tableId }: MenuClientProps) {
-  const { data: menu, isLoading, error } = useMenu(restaurantId, tableId)
+  const router = useRouter()
+  const { user, isLoading: authLoading } = useAppSelector((state) => state.auth)
+  const { items: menu, isLoading: menuLoading, error } = useMenu(restaurantId, tableId)
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/auth/login')
+    }
+  }, [user, authLoading, router])
+
+  if (authLoading) {
+    return (
+      <div className="container mx-auto py-8 space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null // Will redirect in useEffect
+  }
+
+  if (menuLoading) {
     return (
       <div className="container mx-auto py-8 space-y-4">
         <Skeleton className="h-12 w-full" />
@@ -46,7 +71,13 @@ export default function MenuClient({ restaurantId, tableId }: MenuClientProps) {
   }
 
   if (error) {
-    return <div className="container mx-auto py-8 text-red-500">Failed to load menu.</div>
+    return (
+      <div className="container mx-auto py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
+          Failed to load menu. Please try again later.
+        </div>
+      </div>
+    )
   }
 
   const groupedItems = groupItemsByCategory(menu || [])

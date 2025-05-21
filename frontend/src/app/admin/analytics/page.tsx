@@ -1,162 +1,158 @@
 'use client'
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts'
+import { useEffect } from 'react'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import AdminNavbar from '@/components/AdminNavbar'
-import { useAnalytics } from '@/hooks/useAnalytics'
-
-
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { format } from 'date-fns'
+import { fetchAnalyticsData } from '@/store/analytics/AnalyticsThunks'
+import { fetchOrders } from '@/store/orders/OrdersThunks'
 
 export default function AnalyticsPage() {
-  const restaurantId = typeof window !== 'undefined' ? localStorage.getItem('restaurantId') : null
-  const { data, isLoading, } = useAnalytics(restaurantId || '')
+  const dispatch = useAppDispatch()
+  const { user } = useAppSelector((state) => state.auth)
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = useAppSelector((state) => state.analytics)
+  const { data: orders, isLoading: ordersLoading, error: ordersError } = useAppSelector((state) => state.orders)
+  const restaurantId = user?.restaurantId || ''
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8 space-y-8">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Skeleton className="h-[400px]" />
-          <Skeleton className="h-[400px]" />
-        </div>
-      </div>
-    )
+  useEffect(() => {
+    if (restaurantId) {
+      dispatch(fetchAnalyticsData(restaurantId))
+      dispatch(fetchOrders(restaurantId))
+    }
+  }, [dispatch, restaurantId])
+
+  if (!user) {
+    return <div>Please log in as a restaurant admin.</div>
   }
 
-  if (!data) {
-    return (
-      <div className="container mx-auto py-8">
-        <h2 className="text-2xl font-bold mb-6">Analytics</h2>
-        <p className="text-center text-gray-500">No data available</p>
-      </div>
-    )
+  if (analyticsLoading || ordersLoading) {
+    return <div>Loading analytics...</div>
   }
 
-  const totalRevenue = data.revenuePerDay.reduce((sum, day) => sum + day.revenue, 0)
+  if (analyticsError || ordersError) {
+    return <div>Error loading analytics</div>
+  }
+
+  const totalRevenue = analytics?.revenuePerDay?.reduce((sum, day) => sum + day.revenue, 0) || 0
+  const totalOrders = analytics?.revenuePerDay?.length || 0
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
   return (
     <>
-    <AdminNavbar />
-    <div className="container mx-auto py-8">
-      <h2 className="text-2xl font-bold mb-6">Analytics Dashboard</h2>
+      <AdminNavbar />
+      <div className="container mx-auto py-8">
+        <h1 className="text-3xl font-bold mb-8">Analytics</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+              <p className="text-sm text-gray-500">Last 7 days</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Orders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalOrders}</div>
+              <p className="text-sm text-gray-500">Last 7 days</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Average Order Value</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${averageOrderValue.toFixed(2)}</div>
+              <p className="text-sm text-gray-500">Last 7 days</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analytics?.revenuePerDay || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Selling Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics?.topItems || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="totalQuantity" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Orders */}
+        <Card className="mt-8">
           <CardHeader>
-            <CardTitle>Total Orders (This Month)</CardTitle>
+            <CardTitle>Recent Orders</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{data.totalOrdersThisMonth}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Revenue (Last 7 Days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">${totalRevenue.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Average Order Value</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              ${(totalRevenue / data.totalOrdersThisMonth || 0).toFixed(2)}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue Trend (Last 7 Days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.revenuePerDay}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(date: string) => new Date(date).toLocaleDateString()}
-                  />
-                  <YAxis
-                    tickFormatter={(value: number) => `$${value}`}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => [`$${value}`, 'Revenue']}
-                    labelFormatter={(date: string) => new Date(date).toLocaleDateString()}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#8884d8"
-                    name="Revenue"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              {orders?.slice(0, 5).map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div>
+                    <p className="font-medium">Order #{order.id}</p>
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(order.createdAt), 'PPpp')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">${order.total.toFixed(2)}</p>
+                    <p className={`text-sm ${
+                      order.status === 'COMPLETED' ? 'text-green-500' :
+                      order.status === 'PENDING' ? 'text-yellow-500' :
+                      'text-red-500'
+                    }`}>
+                      {order.status}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Items by Quantity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.topItems}
-                    dataKey="totalQuantity"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={150}
-                    label={({ name, percent }: { name: string; percent: number }) =>
-                      `${name} (${(percent * 100).toFixed(0)}%)`
-                    }
-                  >
-                    {data.topItems.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => [`${value} units`, 'Quantity']}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
       </div>
-    </div>
     </>
   )
 } 

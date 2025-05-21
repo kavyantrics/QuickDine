@@ -1,22 +1,36 @@
-import { useState } from 'react'
-import { signupRestaurant, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { Restaurant } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { signupRestaurant } from '@/store/auth/AuthThunks'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 export function useSignupRestaurant() {
-  const [state, setState] = useState<ApiState<Restaurant>>(createInitialApiState())
+  const dispatch = useAppDispatch()
+  const router = useRouter()
+  const { isLoading, error } = useAppSelector((state) => state.auth)
 
-  const mutate = async (data: any) => {
-    setState(createLoadingApiState())
+  const signup = async (data: {
+    name: string
+    email: string
+    password: string
+    restaurant: {
+      name: string
+      address: string
+      phone: string
+    }
+  }) => {
     try {
-      const registered = await signupRestaurant(data)
-      setState(createSuccessApiState(registered))
-      return registered
-    } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to register restaurant'))
-      throw err
+      await dispatch(signupRestaurant(data)).unwrap()
+      toast.success('Restaurant account created successfully!')
+      router.push('/login')
+    } catch (error) {
+      toast.error('Failed to create restaurant account.')
+      throw error
     }
   }
 
-  const reset = () => setState(createInitialApiState())
-  return { ...state, signupRestaurant: mutate, reset }
+  return {
+    signup,
+    isLoading,
+    error,
+  }
 } 

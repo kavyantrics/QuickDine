@@ -1,30 +1,23 @@
-import { useState, useCallback, useEffect } from 'react'
-import { updateUser, ApiState, createInitialApiState, createLoadingApiState, createErrorApiState, createSuccessApiState } from '@/lib/api'
-import { User } from '@/types'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { setUser, setLoading, setError } from '@/store/auth/AuthSlice'
+import { updateUser } from '@/lib/api'
+import { User } from '@/store/auth/Types'
 
 export function useUserProfile(userId: string, initialData?: User) {
-  const [state, setState] = useState<ApiState<User>>(initialData ? createSuccessApiState(initialData) : createInitialApiState())
-
-  const fetchUser = useCallback(async () => {
-    // If you have a getUser API, use it here. For now, just use initialData.
-    if (initialData) setState(createSuccessApiState(initialData))
-  }, [initialData])
-
-  useEffect(() => {
-    fetchUser()
-  }, [fetchUser])
+  const dispatch = useAppDispatch()
+  const { user, isLoading, error } = useAppSelector((state) => state.auth)
 
   const update = async (data: Partial<User>) => {
-    setState(createLoadingApiState())
+    dispatch(setLoading(true))
     try {
       const updated = await updateUser(userId, data)
-      setState(createSuccessApiState(updated))
+      dispatch(setUser(updated))
       return updated
     } catch (err) {
-      setState(createErrorApiState(err instanceof Error ? err.message : 'Failed to update user'))
+      dispatch(setError(err instanceof Error ? err.message : 'Failed to update user'))
       throw err
     }
   }
 
-  return { ...state, updateUser: update, refetch: fetchUser }
+  return { user, isLoading, error, updateUser: update }
 } 

@@ -3,7 +3,8 @@
 import { MenuItem } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useCart } from '@/contexts/cart-context'
+import { useAppDispatch } from '@/store/hooks'
+import { addItem } from '@/store/cart/CartSlice'
 import { toast } from 'sonner'
 import Image from 'next/image'
 
@@ -12,10 +13,10 @@ interface MenuCardProps {
 }
 
 export function MenuCard({ item }: MenuCardProps) {
-  const { addItem } = useCart()
+  const dispatch = useAppDispatch()
 
   const handleAddToCart = () => {
-    addItem(item)
+    dispatch(addItem({ ...item, quantity: 1 }))
     toast.success(`${item.name} added to cart`)
   }
 

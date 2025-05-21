@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/contexts/auth-context'
+import { useAppSelector, useAppDispatch } from '@/store/hooks'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -11,9 +11,12 @@ import { useUserProfile } from '@/hooks/useUserProfile'
 import { useRestaurantProfile } from '@/hooks/useRestaurantProfile'
 import { useCreateRestaurant } from '@/hooks/useCreateRestaurant'
 import { useRegisterRestaurant } from '@/hooks/useRegisterRestaurant'
+import { getRestaurant } from '@/lib/api'
+import { setUser } from '@/store/auth/AuthSlice'
 
 export default function UserDetailsPage() {
-  const { user, setUser } = useAuth()
+  const dispatch = useAppDispatch()
+  const { user } = useAppSelector((state) => state.auth)
   const userId = user?.id || ''
   const restaurantId = user?.restaurantId || ''
   const { updateUser } = useUserProfile(userId, user || undefined)
@@ -48,8 +51,9 @@ export default function UserDetailsPage() {
     adminEmail: '',
     adminPassword: '',
   })
+  
+  const [restaurantLoading, setRestaurantLoading] = useState(false)
 
-  // Fetch restaurant details on mount
   useEffect(() => {
     const fetchRestaurant = async () => {
       if (user?.restaurantId) {
@@ -84,7 +88,7 @@ export default function UserDetailsPage() {
     setIsLoading(true)
     try {
       const updatedUser = await updateUser(userForm)
-      setUser({ ...user, ...updatedUser })
+      dispatch(setUser({ ...user, ...updatedUser }))
       toast.success('User profile updated!')
     } catch {
       toast.error('Failed to update user profile')
@@ -154,7 +158,7 @@ export default function UserDetailsPage() {
         </form>
 
         <h1 className="text-2xl font-bold mb-4">Restaurant Details</h1>
-        {restaurantIsLoading ? (
+        {restaurantLoading || restaurantIsLoading ? (
           <div>Loading restaurant details...</div>
         ) : (
           <form onSubmit={handleRestaurantSubmit} className="space-y-4">
