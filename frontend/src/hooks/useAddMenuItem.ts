@@ -1,7 +1,7 @@
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { setLoading, setError } from '@/store/menu/MenuSlice'
 import { addMenuItem } from '@/lib/api'
-import { MenuItem } from '@/store/menu/Types'
+import { MenuItem } from '@/types'
 
 export function useAddMenuItem() {
   const dispatch = useAppDispatch()

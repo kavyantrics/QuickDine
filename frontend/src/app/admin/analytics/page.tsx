@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import AdminNavbar from '@/components/AdminNavbar'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
-import { format } from 'date-fns'
-import { fetchAnalyticsData } from '@/store/analytics/AnalyticsThunks'
+import { format, subDays } from 'date-fns'
+import { fetchAnalyticsByDateRange, fetchAnalyticsByCategory } from '@/store/analytics/AnalyticsThunks'
 import { fetchOrders } from '@/store/orders/OrdersThunks'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MenuCategory } from '@/lib/constants'
 
 export default function AnalyticsPage() {
   const dispatch = useAppDispatch()
@@ -15,13 +17,26 @@ export default function AnalyticsPage() {
   const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = useAppSelector((state) => state.analytics)
   const { data: orders, isLoading: ordersLoading, error: ordersError } = useAppSelector((state) => state.orders)
   const restaurantId = user?.restaurantId || ''
+  const [dateRange, setDateRange] = useState('7d')
+  const [category, setCategory] = useState<string>('')
 
   useEffect(() => {
     if (restaurantId) {
-      dispatch(fetchAnalyticsData(restaurantId))
+      const endDate = new Date()
+      const startDate = subDays(endDate, dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90)
+      
+      if (category) {
+        dispatch(fetchAnalyticsByCategory({ restaurantId, category }))
+      } else {
+        dispatch(fetchAnalyticsByDateRange({ 
+          restaurantId, 
+          startDate: startDate.toISOString(), 
+          endDate: endDate.toISOString() 
+        }))
+      }
       dispatch(fetchOrders(restaurantId))
     }
-  }, [dispatch, restaurantId])
+  }, [dispatch, restaurantId, dateRange, category])
 
   if (!user) {
     return <div>Please log in as a restaurant admin.</div>
@@ -43,7 +58,34 @@ export default function AnalyticsPage() {
     <>
       <AdminNavbar />
       <div className="container mx-auto py-8">
-        <h1 className="text-3xl font-bold mb-8">Analytics</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Analytics</h1>
+          <div className="flex gap-4">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select date range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Categories</SelectItem>
+                {Object.values(MenuCategory).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -53,7 +95,11 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-sm text-gray-500">Last 7 days</p>
+              <p className="text-sm text-gray-500">
+                {dateRange === '7d' ? 'Last 7 days' : 
+                 dateRange === '30d' ? 'Last 30 days' : 
+                 'Last 90 days'}
+              </p>
             </CardContent>
           </Card>
 
@@ -63,7 +109,11 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalOrders}</div>
-              <p className="text-sm text-gray-500">Last 7 days</p>
+              <p className="text-sm text-gray-500">
+                {dateRange === '7d' ? 'Last 7 days' : 
+                 dateRange === '30d' ? 'Last 30 days' : 
+                 'Last 90 days'}
+              </p>
             </CardContent>
           </Card>
 
@@ -73,7 +123,11 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${averageOrderValue.toFixed(2)}</div>
-              <p className="text-sm text-gray-500">Last 7 days</p>
+              <p className="text-sm text-gray-500">
+                {dateRange === '7d' ? 'Last 7 days' : 
+                 dateRange === '30d' ? 'Last 30 days' : 
+                 'Last 90 days'}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -138,7 +192,7 @@ export default function AnalyticsPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${order.total.toFixed(2)}</p>
+                    <p className="font-medium">${(order.total ?? 0).toFixed(2)}</p>
                     <p className={`text-sm ${
                       order.status === 'COMPLETED' ? 'text-green-500' :
                       order.status === 'PENDING' ? 'text-yellow-500' :

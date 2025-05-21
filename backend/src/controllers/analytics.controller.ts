@@ -1,112 +1,123 @@
-import { Request, Response, NextFunction } from 'express'
-import { PrismaClient } from '@prisma/client'
-import { AppError } from '../utils/errors'
+import { Request, Response } from 'express'
+import { PrismaClient, MenuCategory, Order, OrderItem, MenuItem } from '@prisma/client'
+import { startOfDay, endOfDay, subDays, parseISO } from 'date-fns'
 
 const prisma = new PrismaClient()
 
-// Define the user type
-interface User {
-  id: string
-  email: string
-  role: string
-  restaurantId: string
+type OrderWithItems = Order & {
+  items: (OrderItem & {
+    menuItem: MenuItem
+  })[]
 }
 
-
-export const getAnalytics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getAnalytics = async (req: Request, res: Response) => {
   try {
     const { restaurantId } = req.params
+    const { startDate, endDate, category } = req.query
 
-    if (!restaurantId) {
-      return next(new AppError('Restaurant ID is required', 400))
-    }
+    // Get date range
+    const end = endDate ? parseISO(endDate as string) : new Date()
+    const start = startDate ? parseISO(startDate as string) : subDays(end, 7)
 
-    // Get current date and start of month
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const startOfLastWeek = new Date(now)
-    startOfLastWeek.setDate(now.getDate() - 7)
+    // Get orders within date range
+    const orders = await prisma.order.findMany({
+      where: {
+        restaurantId,
+        createdAt: {
+          gte: startOfDay(start),
+          lte: endOfDay(end),
+        },
+        ...(category ? {
+          items: {
+            some: {
+              menuItem: {
+                category: category as MenuCategory
+              }
+            }
+          }
+        } : {})
+      },
+      include: {
+        items: {
+          include: {
+            menuItem: true
+          }
+        }
+      }
+    }) as OrderWithItems[]
 
-    // Get total orders this month
+    // Calculate revenue per day
+    const revenuePerDay = orders.reduce((acc: { date: string; revenue: number }[], order) => {
+      const date = order.createdAt.toISOString().split('T')[0]
+      const existingDay = acc.find(day => day.date === date)
+      
+      if (existingDay) {
+        existingDay.revenue += order.totalAmount
+      } else {
+        acc.push({
+          date,
+          revenue: order.totalAmount
+        })
+      }
+      
+      return acc
+    }, [])
+
+    // Calculate top selling items
+    const itemCounts = orders.reduce((acc: Record<string, {
+      id: string;
+      name: string;
+      price: number;
+      category: MenuCategory;
+      totalQuantity: number;
+    }>, order) => {
+      order.items.forEach(item => {
+        const key = item.menuItem.id
+        if (!acc[key]) {
+          acc[key] = {
+            id: item.menuItem.id,
+            name: item.menuItem.name,
+            price: item.menuItem.price,
+            category: item.menuItem.category,
+            totalQuantity: 0
+          }
+        }
+        acc[key].totalQuantity += item.quantity
+      })
+      return acc
+    }, {})
+
+    const topItems = Object.values(itemCounts)
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 10)
+
+    // Calculate total orders this month
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+
     const totalOrdersThisMonth = await prisma.order.count({
       where: {
         restaurantId,
         createdAt: {
-          gte: startOfMonth,
-        },
-      },
-    })
-
-    // Get revenue per day for last 7 days
-    const revenuePerDay = await prisma.order.groupBy({
-      by: ['createdAt'],
-      where: {
-        restaurantId,
-        createdAt: {
-          gte: startOfLastWeek,
-        },
-      },
-      _sum: {
-        totalAmount: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    })
-
-    // Get most frequently ordered items
-    const topItems = await prisma.orderItem.groupBy({
-      by: ['menuItemId'],
-      where: {
-        order: {
-          restaurantId,
-        },
-      },
-      _sum: {
-        quantity: true,
-      },
-      orderBy: {
-        _sum: {
-          quantity: 'desc',
-        },
-      },
-      take: 5,
-    })
-
-    // Get menu item details for top items
-    const topItemsWithDetails = await Promise.all(
-      topItems.map(async (item) => {
-        const menuItem = await prisma.menuItem.findUnique({
-          where: { id: item.menuItemId },
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            category: true,
-          },
-        })
-        return {
-          ...menuItem,
-          totalQuantity: item._sum.quantity,
+          gte: startOfMonth
         }
-      })
-    )
-
-    // Format revenue per day data
-    const formattedRevenuePerDay = revenuePerDay.map((day) => ({
-      date: day.createdAt.toISOString().split('T')[0],
-      revenue: day._sum.totalAmount || 0,
-    }))
+      }
+    })
 
     res.json({
       success: true,
       data: {
         totalOrdersThisMonth,
-        revenuePerDay: formattedRevenuePerDay,
-        topItems: topItemsWithDetails,
+        revenuePerDay,
+        topItems
       }
     })
   } catch (error) {
-    next(error instanceof Error ? error : new AppError('Failed to fetch analytics', 500))
+    console.error('Error fetching analytics:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch analytics data'
+    })
   }
 }

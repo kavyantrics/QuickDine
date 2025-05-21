@@ -7,8 +7,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton'
 import { MenuItem } from '@/types'
 import { useAppSelector } from '@/store/hooks'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 
 interface MenuClientProps {
   restaurantId: string
@@ -36,15 +34,8 @@ const formatCategoryName = (category: string) => {
 }
 
 export default function MenuClient({ restaurantId, tableId }: MenuClientProps) {
-  const router = useRouter()
-  const { user, isLoading: authLoading } = useAppSelector((state) => state.auth)
-  const { items: menu, isLoading: menuLoading, error } = useMenu(restaurantId, tableId)
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth/login')
-    }
-  }, [user, authLoading, router])
+  const {isLoading: authLoading } = useAppSelector((state) => state.auth)
+  const { data: menu, isLoading: menuLoading, error } = useMenu(restaurantId, tableId)
 
   if (authLoading) {
     return (
@@ -56,9 +47,7 @@ export default function MenuClient({ restaurantId, tableId }: MenuClientProps) {
     )
   }
 
-  if (!user) {
-    return null // Will redirect in useEffect
-  }
+
 
   if (menuLoading) {
     return (

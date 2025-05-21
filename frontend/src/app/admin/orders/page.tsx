@@ -99,13 +99,25 @@ export default function OrdersPage() {
     return <div>Error loading orders: {error}</div>
   }
 
+  if (!orders || orders.length === 0) {
+    return (
+      <>
+        <AdminNavbar />
+        <div className="container mx-auto py-8">
+          <h1 className="text-3xl font-bold mb-8">Orders</h1>
+          <p>No orders found.</p>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <AdminNavbar />
       <div className="container mx-auto py-8">
         <h1 className="text-3xl font-bold mb-8">Orders</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {orders?.map((order) => (
+          {orders.map((order) => (
             <Card key={order.id}>
               <CardHeader>
                 <CardTitle className="flex justify-between items-center">
@@ -138,7 +150,7 @@ export default function OrdersPage() {
                     </ul>
                   </div>
                   <div>
-                    <p className="font-medium">Total: ${order.total.toFixed(2)}</p>
+                    <p className="font-medium">Total: ${(order.total || 0).toFixed(2)}</p>
                     <p className="text-sm">
                       Status: {order.status}
                     </p>

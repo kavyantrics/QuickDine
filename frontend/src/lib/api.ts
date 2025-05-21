@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
+import type { InternalAxiosRequestConfig as AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
 import { MenuItem, Order, Restaurant, LoginResponse, SignupRestaurantData, OrderData, AnalyticsData } from '@/types/index'
 import { ApiResponse } from '@/store/types'
 
@@ -248,5 +248,12 @@ export async function registerRestaurant(
 export async function refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
   const response = await api.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', { refreshToken })
   const result = await handleResponse<ApiResponse<{ accessToken: string }>>(response)
+  return result.data
+}
+
+// Add menu item to cart
+export async function addMenuItem(restaurantId: string, item: Omit<MenuItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<MenuItem> {
+  const response = await api.post<ApiResponse<MenuItem>>(`/restaurants/${restaurantId}/menu`, item)
+  const result = await handleResponse<ApiResponse<MenuItem>>(response)
   return result.data
 } 

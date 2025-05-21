@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 
 export function useMenu(restaurantId: string, tableId: string) {
   const dispatch = useAppDispatch()
-  const { items, isLoading, error } = useAppSelector((state) => state.menu)
+  const { data, isLoading, error } = useAppSelector((state) => state.menu)
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -24,7 +24,7 @@ export function useMenu(restaurantId: string, tableId: string) {
   }, [dispatch, restaurantId, tableId])
 
   return {
-    items,
+    data,
     isLoading,
     error,
   }
